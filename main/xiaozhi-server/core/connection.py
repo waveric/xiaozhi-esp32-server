@@ -1020,15 +1020,18 @@ class ConnectionHandler:
                                 safe_end = max(sent_len, len(da_text) - _DA_STREAM_BUFFER)
                                 if safe_end > sent_len:
                                     new_part = da_text[sent_len:safe_end]
-                                    tc["_da_sent"] = safe_end
-                                    self.tts.tts_text_queue.put(
-                                        TTSMessageDTO(
-                                            sentence_id=current_sentence_id,
-                                            sentence_type=SentenceType.MIDDLE,
-                                            content_type=ContentType.TEXT,
-                                            content_detail=new_part,
+                                    # 清理 delta 中可能泄漏的 JSON 闭合垃圾
+                                    new_part = self._clean_response_garbage(new_part)
+                                    if new_part:
+                                        tc["_da_sent"] = safe_end
+                                        self.tts.tts_text_queue.put(
+                                            TTSMessageDTO(
+                                                sentence_id=current_sentence_id,
+                                                sentence_type=SentenceType.MIDDLE,
+                                                content_type=ContentType.TEXT,
+                                                content_detail=new_part,
+                                            )
                                         )
-                                    )
                 else:
                     content = response
 
@@ -1116,7 +1119,7 @@ class ConnectionHandler:
                             sent_len = tc.get("_da_sent", 0)
                             remaining = da_response[sent_len:]
                             if remaining:
-                                remaining = self._clean_trailing_json_garbage(remaining)
+                                remaining = self._clean_response_garbage(remaining)
                                 if remaining:
                                     self.tts.tts_text_queue.put(
                                         TTSMessageDTO(
@@ -1127,7 +1130,7 @@ class ConnectionHandler:
                                         )
                                     )
                             # 写入对话历史
-                            da_response = self._clean_trailing_json_garbage(da_response)
+                            da_response = self._clean_response_garbage(da_response)
                             self.tts.store_tts_text(current_sentence_id, da_response)
                             self.dialogue.put(Message(role="assistant", content=da_response))
 
@@ -1594,18 +1597,26 @@ class ConnectionHandler:
         return raw
 
     @staticmethod
-    def _clean_trailing_json_garbage(text):
-        """清理 response 末尾可能泄漏的 JSON 闭合符号。
-        模型有时会在 response 内容中生成 JSON 闭合字符（如 ）"}} 或 '}），
+    def _clean_response_garbage(text):
+        """清理 response 中可能泄漏的 JSON 闭合符号。
+        模型有时会在 response 内容中生成 JSON 闭合字符（如 ）"}} 或 '})，
         这些不是故事内容的一部分，需要去除。
         """
         if not text:
             return text
-        # 匹配末尾的 JSON 闭合垃圾模式：
-        # 可选的中文标点 ）')，紧跟 " 和 } 的组合，中间可夹杂空白/换行
-        # 例如：）"}}  '}"  }}  "}} 等
-        cleaned = re.sub(r'[\s\n]*[）\)]?[\s\n]*["\'}\]]{1,6}$', '', text)
-        return cleaned if cleaned else text
+        # 清理独立一行的 JSON 闭合垃圾（如 ）"}}  '}}  "}}  }}  } ）
+        _garbage_chars = frozenset('")\'}）')
+        lines = text.split('\n')
+        cleaned = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and len(stripped) <= 8 and all(c in _garbage_chars for c in stripped):
+                continue
+            cleaned.append(line)
+        result = '\n'.join(cleaned)
+        # 清理末尾残留的 JSON 闭合符号
+        result = re.sub(r'["\'}\]]+$', '', result.rstrip()).rstrip()
+        return result
 
     def _merge_tool_calls(self, tool_calls_list, tools_call):
         """合并工具调用列表
