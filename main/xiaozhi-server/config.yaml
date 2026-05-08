@@ -1092,18 +1092,6 @@ TTS:
     format: mp3 # 接口返回的音频格式
     output_dir: tmp/
     # language: "中文"  # 指定输出语种,如:中文、英语、日语、韩语等,请根据所选音色支持的语言进行设置,不填则默认为中文
-  LinkeraiTTS:
-    type: linkerai
-    api_url: https://tts.linkerai.cn/tts
-    audio_format: "pcm"
-    # 默认的access_token供大家测试时免费使用的，此access_token请勿用于商业用途
-    # 如果效果不错，可自行申请token，申请地址：https://linkerai.cn
-    # 各参数意义见开发文档：https://tts.linkerai.cn/docs
-    # 支持声音克隆，可自行上传音频，填入voice参数，voice参数为空时，使用默认声音
-    access_token: "U4YdYXVfpwWnk2t5Gp822zWPCuORyeJL"
-    voice: "OUeAo1mhq6IBExi"
-    output_dir: tmp/
-    # language: "中文"  # 指定输出语种,如:中文、英语、日语、韩语等,请根据所选音色支持的语言进行设置,不填则默认为中文
   PaddleSpeechTTS:
     #百度飞浆 PaddleSpeech 支持本地离线部署 支持模型训练
     #框架地址 https://www.paddlepaddle.org.cn/
