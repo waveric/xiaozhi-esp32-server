@@ -1,4 +1,4 @@
-[![Banners](docs/images/banner1.png)](https://github.com/xinnan-tech/xiaozhi-esp32-server)
+[![Banners](../images/banner1.png)](https://github.com/xinnan-tech/xiaozhi-esp32-server)
 
 <h1 align="center">Xiaozhi Backend Service xiaozhi-esp32-server</h1>
 
@@ -10,14 +10,14 @@ Support for MQTT+UDP protocol, Websocket protocol, MCP access point, voiceprint 
 </p>
 
 <p align="center">
-<a href="./docs/FAQ.md">FAQ</a>
+<a href="../FAQ.md">FAQ</a>
 · <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/issues">Report Issues</a>
-· <a href="./README.md#%E9%83%A8%E7%BD%B2%E6%96%87%E6%A1%A3">Deployment Docs</a>
+· <a href="../../README.md#%E9%83%A8%E7%BD%B2%E6%96%87%E6%A1%A3">Deployment Docs</a>
 · <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/releases">Release Notes</a>
 </p>
 
 <p align="center">
-  <a href="./README.md"><img alt="简体中文版自述文件" src="https://img.shields.io/badge/简体中文-DFE0E5"></a>
+  <a href="../../README.md"><img alt="简体中文版自述文件" src="https://img.shields.io/badge/简体中文-DFE0E5"></a>
   <a href="./README_en.md"><img alt="README in English" src="https://img.shields.io/badge/English-DBEDFA"></a>
   <a href="./README_vi.md"><img alt="Tiếng Việt" src="https://img.shields.io/badge/Tiếng Việt-DFE0E5"></a>
   <a href="./README_de.md"><img alt="Deutsch" src="https://img.shields.io/badge/Deutsch-DFE0E5"></a>
@@ -38,7 +38,7 @@ Spearheaded by Professor Siyuan Liu's Team (South China University of Technology
 </br>
 刘思源教授团队主导研发（华南理工大学）
 </br>
-<img src="./docs/images/hnlg.jpg" alt="South China University of Technology" width="50%">
+<img src="../images/hnlg.jpg" alt="South China University of Technology" width="50%">
 </p>
 
 ---
@@ -54,35 +54,35 @@ Want to see the usage effects? Click the videos below 🎥
     <td>
         <a href="https://www.bilibili.com/video/BV1FMFyejExX" target="_blank">
          <picture>
-           <img alt="响应速度感受" src="docs/images/demo9.png" />
+           <img alt="响应速度感受" src="../images/demo9.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV1vchQzaEse" target="_blank">
          <picture>
-           <img alt="速度优化秘诀" src="docs/images/demo6.png" />
+           <img alt="速度优化秘诀" src="../images/demo6.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV1C1tCzUEZh" target="_blank">
          <picture>
-           <img alt="复杂医疗场景" src="docs/images/demo1.png" />
+           <img alt="复杂医疗场景" src="../images/demo1.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV1zUW5zJEkq" target="_blank">
          <picture>
-           <img alt="MQTT指令下发" src="docs/images/demo4.png" />
+           <img alt="MQTT指令下发" src="../images/demo4.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV1Exu3zqEDe" target="_blank">
          <picture>
-           <img alt="声纹识别" src="docs/images/demo14.png" />
+           <img alt="声纹识别" src="../images/demo14.png" />
          </picture>
         </a>
     </td>
@@ -91,35 +91,35 @@ Want to see the usage effects? Click the videos below 🎥
     <td>
         <a href="https://www.bilibili.com/video/BV1pNXWYGEx1" target="_blank">
          <picture>
-           <img alt="控制家电开关" src="docs/images/demo5.png" />
+           <img alt="控制家电开关" src="../images/demo5.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV1ZQKUzYExM" target="_blank">
          <picture>
-           <img alt="MCP接入点" src="docs/images/demo13.png" />
+           <img alt="MCP接入点" src="../images/demo13.png" />
          </picture>
         </a>
     </td>
     <td>
       <a href="https://www.bilibili.com/video/BV1TJ7WzzEo6" target="_blank">
          <picture>
-           <img alt="多指令任务" src="docs/images/demo11.png" />
+           <img alt="多指令任务" src="../images/demo11.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV1VC96Y5EMH" target="_blank">
          <picture>
-           <img alt="播放音乐" src="docs/images/demo7.png" />
+           <img alt="播放音乐" src="../images/demo7.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV1Z8XuYZEAS" target="_blank">
          <picture>
-           <img alt="天气插件" src="docs/images/demo8.png" />
+           <img alt="天气插件" src="../images/demo8.png" />
          </picture>
         </a>
     </td>
@@ -128,35 +128,35 @@ Want to see the usage effects? Click the videos below 🎥
     <td>
       <a href="https://www.bilibili.com/video/BV12J7WzBEaH" target="_blank">
          <picture>
-           <img alt="实时打断" src="docs/images/demo10.png" />
+           <img alt="实时打断" src="../images/demo10.png" />
          </picture>
         </a>
     </td>
     <td>
       <a href="https://www.bilibili.com/video/BV1Co76z7EvK" target="_blank">
          <picture>
-           <img alt="拍照识物品" src="docs/images/demo12.png" />
+           <img alt="拍照识物品" src="../images/demo12.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV1CDKWemEU6" target="_blank">
          <picture>
-           <img alt="自定义音色" src="docs/images/demo2.png" />
+           <img alt="自定义音色" src="../images/demo2.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV12yA2egEaC" target="_blank">
          <picture>
-           <img alt="使用粤语交流" src="docs/images/demo3.png" />
+           <img alt="使用粤语交流" src="../images/demo3.png" />
          </picture>
         </a>
     </td>
     <td>
         <a href="https://www.bilibili.com/video/BV17LXWYvENb" target="_blank">
          <picture>
-           <img alt="播报新闻" src="docs/images/demo0.png" />
+           <img alt="播报新闻" src="../images/demo0.png" />
          </picture>
         </a>
     </td>
@@ -175,17 +175,17 @@ Want to see the usage effects? Click the videos below 🎥
 
 ## Deployment Documentation
 
-![Banners](docs/images/banner2.png)
+![Banners](../images/banner2.png)
 
 This project provides two deployment methods. Please choose based on your specific needs:
 
 #### 🚀 Deployment Method Selection
 | Deployment Method | Features | Applicable Scenarios | Deployment Docs | Configuration Requirements | Video Tutorials | 
 |---------|------|---------|---------|---------|---------|
-| **Simplified Installation** | Intelligent dialogue, single agent management | Low-configuration environments, data stored in config files, no database required | [①Docker Version](./docs/Deployment.md#%E6%96%B9%E5%BC%8F%E4%B8%80docker%E5%8F%AA%E8%BF%90%E8%A1%8Cserver) / [②Source Code Deployment](./docs/Deployment.md#%E6%96%B9%E5%BC%8F%E4%BA%8C%E6%9C%AC%E5%9C%B0%E6%BA%90%E7%A0%81%E5%8F%AA%E8%BF%90%E8%A1%8Cserver)| 2 cores 4GB if using `FunASR`, 2 cores 2GB if all APIs | - | 
-| **Full Module Installation** | Intelligent dialogue, multi-user management, multi-agent management, intelligent console interface operation | Complete functionality experience, data stored in database |[①Docker Version](./docs/Deployment_all.md#%E6%96%B9%E5%BC%8F%E4%B8%80docker%E8%BF%90%E8%A1%8C%E5%85%A8%E6%A8%A1%E5%9D%97) / [②Source Code Deployment](./docs/Deployment_all.md#%E6%96%B9%E5%BC%8F%E4%BA%8C%E6%9C%AC%E5%9C%B0%E6%BA%90%E7%A0%81%E8%BF%90%E8%A1%8C%E5%85%A8%E6%A8%A1%E5%9D%97) / [③Source Code Deployment Auto-Update Tutorial](./docs/dev-ops-integration.md) | 4 cores 8GB if using `FunASR`, 2 cores 4GB if all APIs| [Local Source Code Startup Video Tutorial](https://www.bilibili.com/video/BV1wBJhz4Ewe) |
+| **Simplified Installation** | Intelligent dialogue, single agent management | Low-configuration environments, data stored in config files, no database required | [①Docker Version](../Deployment.md#%E6%96%B9%E5%BC%8F%E4%B8%80docker%E5%8F%AA%E8%BF%90%E8%A1%8Cserver) / [②Source Code Deployment](../Deployment.md#%E6%96%B9%E5%BC%8F%E4%BA%8C%E6%9C%AC%E5%9C%B0%E6%BA%90%E7%A0%81%E5%8F%AA%E8%BF%90%E8%A1%8Cserver)| 2 cores 4GB if using `FunASR`, 2 cores 2GB if all APIs | - | 
+| **Full Module Installation** | Intelligent dialogue, multi-user management, multi-agent management, intelligent console interface operation | Complete functionality experience, data stored in database |[①Docker Version](../Deployment_all.md#%E6%96%B9%E5%BC%8F%E4%B8%80docker%E8%BF%90%E8%A1%8C%E5%85%A8%E6%A8%A1%E5%9D%97) / [②Source Code Deployment](../Deployment_all.md#%E6%96%B9%E5%BC%8F%E4%BA%8C%E6%9C%AC%E5%9C%B0%E6%BA%90%E7%A0%81%E8%BF%90%E8%A1%8C%E5%85%A8%E6%A8%A1%E5%9D%97) / [③Source Code Deployment Auto-Update Tutorial](../dev-ops-integration.md) | 4 cores 8GB if using `FunASR`, 2 cores 4GB if all APIs| [Local Source Code Startup Video Tutorial](https://www.bilibili.com/video/BV1wBJhz4Ewe) |
 
-For frequently asked questions and related tutorials, please refer to [this link](./docs/FAQ.md)
+For frequently asked questions and related tutorials, please refer to [this link](../FAQ.md)
 
 > 💡 Note: Below is a test platform deployed with the latest code. You can burn and test if needed. Concurrent users: 6, data will be cleared daily.
 
@@ -232,7 +232,7 @@ This project provides the following testing tools to help you verify the system 
 ---
 ## Feature List ✨
 ### Implemented ✅
-![请参考-全模块安装架构图](docs/images/deploy2.png)
+![请参考-全模块安装架构图](../images/deploy2.png)
 | Feature Module | Description |
 |:---:|:---|
 | Core Architecture | Based on [MQTT+UDP gateway](https://github.com/xinnan-tech/xiaozhi-esp32-server/blob/main/docs/mqtt-gateway-integration.md), WebSocket and HTTP servers, provides complete console management and authentication system |
@@ -252,9 +252,9 @@ This project provides the following testing tools to help you verify the system 
 
 ### Under Development 🚧
 
-To learn about specific development plan progress, [click here](https://github.com/users/xinnan-tech/projects/3). For frequently asked questions and related tutorials, please refer to [this link](./docs/FAQ.md)
+To learn about specific development plan progress, [click here](https://github.com/users/xinnan-tech/projects/3). For frequently asked questions and related tutorials, please refer to [this link](../FAQ.md)
 
-If you are a software developer, here is an [Open Letter to Developers](docs/contributor_open_letter.md). Welcome to join!
+If you are a software developer, here is an [Open Letter to Developers](../contributor_open_letter.md). Welcome to join!
 
 ---
 
@@ -329,7 +329,7 @@ In fact, any VLLM that supports OpenAI interface calls can be integrated and use
 | Type | Platform Name | Usage Method | Pricing Model | Notes |
 |:------:|:---------------:|:----:|:---------:|:--:|
 | Memory | mem0ai | Interface calls | 1000 times/month quota | |
-| Memory | [powermem](./docs/powermem-integration.md) | Local summarization | Depends on LLM and DB | OceanBase open source, supports intelligent retrieval |
+| Memory | [powermem](../powermem-integration.md) | Local summarization | Depends on LLM and DB | OceanBase open source, supports intelligent retrieval |
 | Memory | mem_local_short | Local summarization | Free | |
 | Memory | nomem | No memory mode | Free | |
 
@@ -357,13 +357,13 @@ In fact, any VLLM that supports OpenAI interface calls can be integrated and use
 
 | Logo | Project/Company | Description |
 |:---:|:---:|:---|
-| <img src="./docs/images/logo_bailing.png" width="160"> | [Bailing Voice Dialogue Robot](https://github.com/wwbin2017/bailing) | This project is inspired by [Bailing Voice Dialogue Robot](https://github.com/wwbin2017/bailing) and implemented on its basis |
-| <img src="./docs/images/logo_tenclass.png" width="160"> | [Tenclass](https://www.tenclass.com/) | Thanks to [Tenclass](https://www.tenclass.com/) for formulating standard communication protocols, multi-device compatibility solutions, and high-concurrency scenario practice demonstrations for the Xiaozhi ecosystem; providing full-link technical documentation support for this project |
-| <img src="./docs/images/logo_xuanfeng.png" width="160"> | [Xuanfeng Technology](https://github.com/Eric0308) | Thanks to [Xuanfeng Technology](https://github.com/Eric0308) for contributing function calling framework, MCP communication protocol, and plugin-based calling mechanism implementation code. Through standardized instruction scheduling system and dynamic expansion capabilities, it significantly improves the interaction efficiency and functional extensibility of frontend devices (IoT) |
-| <img src="./docs/images/logo_junsen.png" width="160"> | [huangjunsen](https://github.com/huangjunsen0406) | Thanks to [huangjunsen](https://github.com/huangjunsen0406) for contributing the `Smart Control Console Mobile` module, which enables efficient control and real-time interaction across mobile devices, significantly enhancing the system's operational convenience and management efficiency in mobile scenarios. |
-| <img src="./docs/images/logo_huiyuan.png" width="160"> | [Huiyuan Design](http://ui.kwd988.net/) | Thanks to [Huiyuan Design](http://ui.kwd988.net/) for providing professional visual solutions for this project, using their design practical experience serving over a thousand enterprises to empower this project's product user experience |
-| <img src="./docs/images/logo_qinren.png" width="160"> | [Xi'an Qinren Information Technology](https://www.029app.com/) | Thanks to [Xi'an Qinren Information Technology](https://www.029app.com/) for deepening this project's visual system, ensuring consistency and extensibility of overall design style in multi-scenario applications |
-| <img src="./docs/images/logo_contributors.png" width="160"> | [Code Contributors](https://github.com/xinnan-tech/xiaozhi-esp32-server/graphs/contributors) | Thanks to [all code contributors](https://github.com/xinnan-tech/xiaozhi-esp32-server/graphs/contributors), your efforts have made the project more robust and powerful. |
+| <img src="../images/logo_bailing.png" width="160"> | [Bailing Voice Dialogue Robot](https://github.com/wwbin2017/bailing) | This project is inspired by [Bailing Voice Dialogue Robot](https://github.com/wwbin2017/bailing) and implemented on its basis |
+| <img src="../images/logo_tenclass.png" width="160"> | [Tenclass](https://www.tenclass.com/) | Thanks to [Tenclass](https://www.tenclass.com/) for formulating standard communication protocols, multi-device compatibility solutions, and high-concurrency scenario practice demonstrations for the Xiaozhi ecosystem; providing full-link technical documentation support for this project |
+| <img src="../images/logo_xuanfeng.png" width="160"> | [Xuanfeng Technology](https://github.com/Eric0308) | Thanks to [Xuanfeng Technology](https://github.com/Eric0308) for contributing function calling framework, MCP communication protocol, and plugin-based calling mechanism implementation code. Through standardized instruction scheduling system and dynamic expansion capabilities, it significantly improves the interaction efficiency and functional extensibility of frontend devices (IoT) |
+| <img src="../images/logo_junsen.png" width="160"> | [huangjunsen](https://github.com/huangjunsen0406) | Thanks to [huangjunsen](https://github.com/huangjunsen0406) for contributing the `Smart Control Console Mobile` module, which enables efficient control and real-time interaction across mobile devices, significantly enhancing the system's operational convenience and management efficiency in mobile scenarios. |
+| <img src="../images/logo_huiyuan.png" width="160"> | [Huiyuan Design](http://ui.kwd988.net/) | Thanks to [Huiyuan Design](http://ui.kwd988.net/) for providing professional visual solutions for this project, using their design practical experience serving over a thousand enterprises to empower this project's product user experience |
+| <img src="../images/logo_qinren.png" width="160"> | [Xi'an Qinren Information Technology](https://www.029app.com/) | Thanks to [Xi'an Qinren Information Technology](https://www.029app.com/) for deepening this project's visual system, ensuring consistency and extensibility of overall design style in multi-scenario applications |
+| <img src="../images/logo_contributors.png" width="160"> | [Code Contributors](https://github.com/xinnan-tech/xiaozhi-esp32-server/graphs/contributors) | Thanks to [all code contributors](https://github.com/xinnan-tech/xiaozhi-esp32-server/graphs/contributors), your efforts have made the project more robust and powerful. |
 
 
 <a href="https://star-history.com/#xinnan-tech/xiaozhi-esp32-server&Date">
