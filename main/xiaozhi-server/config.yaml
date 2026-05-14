@@ -241,7 +241,8 @@ selected_module:
   # TTS将根据配置名称对应的type调用实际的TTS适配器
   TTS: EdgeTTS
   # 记忆模块，默认不开启记忆；如果想使用超长记忆，推荐使用mem0ai；如果注重隐私，请使用本地的mem_local_short
-  Memory: nomem
+  # lightning: 使用 lightning-tools 服务的记忆功能，在会话初始化时自动加载长期记忆
+  Memory: lightning
   # 意图识别模块开启后，可以播放音乐、控制音量、识别退出指令。
   # 不想开通意图识别，就设置成：nointent
   # 意图识别可使用intent_llm。优点：通用性强，缺点：增加串行前置意图识别模块，会增加处理时间，支持控制音量大小等iot操作
@@ -347,6 +348,11 @@ Memory:
   nomem:
     # 不想使用记忆功能，可以使用nomem
     type: nomem
+  lightning:
+    # 使用 lightning-tools 服务的记忆功能
+    # 在会话初始化时自动从 lightning-tools 获取长期记忆和角色设定
+    type: lightning
+    url: "http://localhost:8080"
   mem_local_short:
     # 本地记忆功能，通过selected_module的llm总结，数据保存在本地服务器，不会上传到外部服务器
     type: mem_local_short

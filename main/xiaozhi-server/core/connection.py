@@ -963,35 +963,32 @@ class ConnectionHandler:
 
         response_message = []
 
-        try:
-            # 使用带记忆的对话
-            memory_str = None
-            memory_start = time.time()
-            # 仅当query非空（代表用户询问）时查询记忆
-            if self.memory is not None and query:
-                future = asyncio.run_coroutine_threadsafe(
-                    self.memory.query_memory(query), self.loop
-                )
-                memory_str = future.result()
-            if memory_str:
-                self.logger.bind(tag=TAG).info(f"[耗时] 记忆查询: {time.time() - memory_start:.3f}s")
+        # 获取记忆内容（仅 depth==0 时获取）
+        # 记忆在会话初始化时已缓存，直接使用同步方法获取
+        memory_str = None
+        if depth == 0 and self.memory:
+            try:
+                # 使用同步方法获取缓存的记忆
+                if hasattr(self.memory, 'get_cached_memory'):
+                    memory_str = self.memory.get_cached_memory()
+                if memory_str:
+                    self.logger.bind(tag=TAG).debug(f"注入记忆: {memory_str[:100]}...")
+            except Exception as e:
+                self.logger.bind(tag=TAG).error(f"获取记忆失败: {e}")
 
+        try:
             llm_start_time = time.time()
             if self.intent_type == "function_call" and functions is not None:
                 # 使用支持functions的streaming接口
                 llm_responses = self.llm.response_with_functions(
                     self.session_id,
-                    self.dialogue.get_llm_dialogue_with_memory(
-                        memory_str, self.config.get("voiceprint", {})
-                    ),
+                    self.dialogue.get_llm_dialogue_with_memory(memory_str),
                     functions=functions,
                 )
             else:
                 llm_responses = self.llm.response(
                     self.session_id,
-                    self.dialogue.get_llm_dialogue_with_memory(
-                        memory_str, self.config.get("voiceprint", {})
-                    ),
+                    self.dialogue.get_llm_dialogue_with_memory(memory_str),
                 )
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"LLM 处理出错 {query}: {e}")
