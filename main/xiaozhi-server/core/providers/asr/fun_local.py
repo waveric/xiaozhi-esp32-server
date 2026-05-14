@@ -40,17 +40,28 @@ class CaptureOutput:
 class ASRProvider(ASRProviderBase):
     def __init__(self, config: dict, delete_audio_file: bool):
         super().__init__()
-        
+
         # 内存检测，要求大于2G
         min_mem_bytes = 2 * 1024 * 1024 * 1024
         total_mem = psutil.virtual_memory().total
         if total_mem < min_mem_bytes:
             logger.bind(tag=TAG).error(f"可用内存不足2G，当前仅有 {total_mem / (1024*1024):.2f} MB，可能无法启动FunASR")
-        
+
         self.interface_type = InterfaceType.LOCAL
         self.model_dir = config.get("model_dir")
         self.output_dir = config.get("output_dir")  # 修正配置键名
         self.delete_audio_file = delete_audio_file
+
+        # 设备配置：支持 cuda:0, cuda, cpu，默认自动检测
+        device = config.get("device")
+        if device is None:
+            import torch
+            if torch.cuda.is_available():
+                device = "cuda:0"
+                logger.bind(tag=TAG).info("检测到 CUDA，使用 GPU 加速")
+            else:
+                device = "cpu"
+                logger.bind(tag=TAG).info("未检测到 CUDA，使用 CPU")
 
         # 确保输出目录存在
         os.makedirs(self.output_dir, exist_ok=True)
@@ -60,7 +71,7 @@ class ASRProvider(ASRProviderBase):
                 vad_kwargs={"max_single_segment_time": 30000},
                 disable_update=True,
                 hub="hf",
-                # device="cuda:0",  # 启用GPU加速
+                device=device,
             )
 
     async def speech_to_text(

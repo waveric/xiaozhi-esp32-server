@@ -16,6 +16,23 @@ from typing import Callable, Any
 
 TAG = __name__
 
+# 设置 pydub 的 ffmpeg 路径
+def _configure_ffmpeg_path():
+    """配置 ffmpeg 路径，支持 conda 环境"""
+    # 检查常见 conda 环境路径
+    conda_paths = [
+        os.environ.get("CONDA_PREFIX"),
+        r"C:\Users\33491\miniconda3\envs\xiaozhi-esp32-server",
+        os.path.expanduser(r"~\miniconda3\envs\xiaozhi-esp32-server"),
+    ]
+    for conda_prefix in conda_paths:
+        if conda_prefix:
+            ffmpeg_path = os.path.join(conda_prefix, "Library", "bin", "ffmpeg.exe")
+            if os.path.exists(ffmpeg_path):
+                AudioSegment.converter = ffmpeg_path
+                return
+_configure_ffmpeg_path()
+
 
 def get_local_ip():
     try:
@@ -164,57 +181,79 @@ def check_ffmpeg_installed() -> bool:
     Raises:
         ValueError: 当检测到 ffmpeg 未安装或依赖缺失时，抛出详细的提示信息。
     """
-    try:
-        # 尝试执行 ffmpeg 命令
-        result = subprocess.run(
-            ["ffmpeg", "-version"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True,  # 非零退出码会触发 CalledProcessError
-        )
+    # 构建 ffmpeg 可能的路径列表
+    ffmpeg_paths = ["ffmpeg"]
 
-        output = (result.stdout + result.stderr).lower()
-        if "ffmpeg version" in output:
-            return True
+    # 添加 conda 环境路径（如果存在）
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        conda_ffmpeg = os.path.join(conda_prefix, "Library", "bin", "ffmpeg.exe")
+        if os.path.exists(conda_ffmpeg):
+            ffmpeg_paths.insert(0, conda_ffmpeg)
 
-        # 如果未检测到版本信息，也视为异常情况
-        raise ValueError("未检测到有效的 ffmpeg 版本输出。")
+    # 尝试常见的 conda 环境路径
+    common_conda_paths = [
+        r"C:\Users\33491\miniconda3\envs\xiaozhi-esp32-server\Library\bin\ffmpeg.exe",
+        os.path.expanduser(r"~\miniconda3\envs\xiaozhi-esp32-server\Library\bin\ffmpeg.exe"),
+    ]
+    for path in common_conda_paths:
+        if os.path.exists(path):
+            ffmpeg_paths.insert(0, path)
 
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        # 提取错误输出
-        stderr_output = ""
-        if isinstance(e, subprocess.CalledProcessError):
-            stderr_output = (e.stderr or "").strip()
-        else:
-            stderr_output = str(e).strip()
+    last_error = None
+    for ffmpeg_cmd in ffmpeg_paths:
+        try:
+            # 尝试执行 ffmpeg 命令
+            result = subprocess.run(
+                [ffmpeg_cmd, "-version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=True,  # 非零退出码会触发 CalledProcessError
+            )
 
-        # 构建基础错误提示
-        error_msg = [
-            "❌ 检测到 ffmpeg 无法正常运行。\n",
-            "建议您：",
-            "1. 确认已正确激活 conda 环境；",
-            "2. 查阅项目安装文档，了解如何在 conda 环境中安装 ffmpeg。\n",
-        ]
+            output = (result.stdout + result.stderr).lower()
+            if "ffmpeg version" in output:
+                return True
 
-        # 🎯 针对具体错误信息提供额外提示
-        if "libiconv.so.2" in stderr_output:
-            error_msg.append("⚠️ 发现缺少依赖库：libiconv.so.2")
-            error_msg.append("解决方法：在当前 conda 环境中执行：")
-            error_msg.append("   conda install -c conda-forge libiconv\n")
-        elif (
-            "no such file or directory" in stderr_output
-            and "ffmpeg" in stderr_output.lower()
-        ):
-            error_msg.append("⚠️ 系统未找到 ffmpeg 可执行文件。")
-            error_msg.append("解决方法：在当前 conda 环境中执行：")
-            error_msg.append("   conda install -c conda-forge ffmpeg\n")
-        else:
-            error_msg.append("错误详情：")
-            error_msg.append(stderr_output or "未知错误。")
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            last_error = e
+            continue
 
-        # 抛出详细异常信息
-        raise ValueError("\n".join(error_msg)) from e
+    # 所有路径都失败，构建错误提示
+    stderr_output = ""
+    if isinstance(last_error, subprocess.CalledProcessError):
+        stderr_output = (last_error.stderr or "").strip()
+    elif last_error:
+        stderr_output = str(last_error).strip()
+
+    # 构建基础错误提示
+    error_msg = [
+        "❌ 检测到 ffmpeg 无法正常运行。\n",
+        "建议您：",
+        "1. 确认已正确激活 conda 环境；",
+        "2. 查阅项目安装文档，了解如何在 conda 环境中安装 ffmpeg。\n",
+    ]
+
+    # 🎯 针对具体错误信息提供额外提示
+    if "libiconv.so.2" in stderr_output:
+        error_msg.append("⚠️ 发现缺少依赖库：libiconv.so.2")
+        error_msg.append("解决方法：在当前 conda 环境中执行：")
+        error_msg.append("   conda install -c conda-forge libiconv\n")
+    elif (
+        "no such file or directory" in stderr_output
+        or "cannot find the file" in stderr_output.lower()
+        or "系统找不到指定的文件" in stderr_output
+    ):
+        error_msg.append("⚠️ 系统未找到 ffmpeg 可执行文件。")
+        error_msg.append("解决方法：在当前 conda 环境中执行：")
+        error_msg.append("   conda install -c conda-forge ffmpeg\n")
+    else:
+        error_msg.append("错误详情：")
+        error_msg.append(stderr_output or "未知错误。")
+
+    # 抛出详细异常信息
+    raise ValueError("\n".join(error_msg)) from last_error
 
 
 def extract_json_from_string(input_string):

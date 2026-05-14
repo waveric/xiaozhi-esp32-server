@@ -14,10 +14,12 @@ logger = setup_logging()
 
 def create_instance(class_name, *args, **kwargs):
     # 创建LLM实例
-    if os.path.exists(os.path.join('core', 'providers', 'llm', class_name, f'{class_name}.py')):
+    # 使用绝对路径检查
+    provider_path = os.path.join(project_root, 'core', 'providers', 'llm', class_name, f'{class_name}.py')
+    if os.path.exists(provider_path):
         lib_name = f'core.providers.llm.{class_name}.{class_name}'
         if lib_name not in sys.modules:
             sys.modules[lib_name] = importlib.import_module(f'{lib_name}')
         return sys.modules[lib_name].LLMProvider(*args, **kwargs)
 
-    raise ValueError(f"不支持的LLM类型: {class_name}，请检查该配置的type是否设置正确")
+    raise ValueError(f"不支持的LLM类型: {class_name}，请检查该配置的type是否设置正确。查找路径: {provider_path}")
