@@ -121,7 +121,11 @@ def ensure_directories(config):
     project_dir = get_project_dir()  # 获取项目根目录
     # 日志文件目录
     log_dir = config.get("log", {}).get("log_dir", "tmp")
-    dirs_to_create.add(os.path.join(project_dir, log_dir))
+    # 支持绝对路径
+    if os.path.isabs(log_dir):
+        dirs_to_create.add(log_dir)
+    else:
+        dirs_to_create.add(os.path.join(project_dir, log_dir))
 
     # ASR/TTS模块输出目录
     for module in ["ASR", "TTS"]:
@@ -130,7 +134,11 @@ def ensure_directories(config):
         for provider in config.get(module, {}).values():
             output_dir = provider.get("output_dir", "")
             if output_dir:
-                dirs_to_create.add(output_dir)
+                # 支持绝对路径
+                if os.path.isabs(output_dir):
+                    dirs_to_create.add(output_dir)
+                else:
+                    dirs_to_create.add(output_dir)
 
     # 根据selected_module创建模型目录
     selected_modules = config.get("selected_module", {})
@@ -145,8 +153,12 @@ def ensure_directories(config):
         provider_config = config.get(module_type, {}).get(selected_provider, {})
         output_dir = provider_config.get("output_dir")
         if output_dir:
-            full_model_dir = os.path.join(project_dir, output_dir)
-            dirs_to_create.add(full_model_dir)
+            # 支持绝对路径
+            if os.path.isabs(output_dir):
+                dirs_to_create.add(output_dir)
+            else:
+                full_model_dir = os.path.join(project_dir, output_dir)
+                dirs_to_create.add(full_model_dir)
 
     # 统一创建目录（保留原data目录创建）
     for dir_path in dirs_to_create:

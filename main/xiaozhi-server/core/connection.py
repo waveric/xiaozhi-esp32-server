@@ -908,6 +908,9 @@ class ConnectionHandler:
         # 保存当前任务的sentence_id到局部变量，避免被新任务覆盖
         current_sentence_id = None
 
+        # 耗时统计
+        chat_start_time = time.time()
+
         if query is not None:
             self.logger.bind(tag=TAG).info(f"大模型收到用户消息: {query}")
 
@@ -963,13 +966,17 @@ class ConnectionHandler:
         try:
             # 使用带记忆的对话
             memory_str = None
+            memory_start = time.time()
             # 仅当query非空（代表用户询问）时查询记忆
             if self.memory is not None and query:
                 future = asyncio.run_coroutine_threadsafe(
                     self.memory.query_memory(query), self.loop
                 )
                 memory_str = future.result()
+            if memory_str:
+                self.logger.bind(tag=TAG).info(f"[耗时] 记忆查询: {time.time() - memory_start:.3f}s")
 
+            llm_start_time = time.time()
             if self.intent_type == "function_call" and functions is not None:
                 # 使用支持functions的streaming接口
                 llm_responses = self.llm.response_with_functions(
@@ -1062,6 +1069,8 @@ class ConnectionHandler:
                                 content_detail=content,
                             )
                         )
+            # LLM 流式响应完成
+            self.logger.bind(tag=TAG).info(f"[耗时] LLM 响应: {time.time() - llm_start_time:.3f}s")
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"LLM stream processing error: {e}")
             self.tts.tts_text_queue.put(

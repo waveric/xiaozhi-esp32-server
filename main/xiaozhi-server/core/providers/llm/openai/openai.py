@@ -1,4 +1,5 @@
 import httpx
+import time
 import openai
 from openai.types import CompletionUsage
 from config.logger import setup_logging
@@ -26,7 +27,7 @@ class LLMProvider(LLMProviderBase):
             self.base_url = config.get("base_url")
         else:
             self.base_url = config.get("url")
-        
+
         timeout_config = config.get("timeout")
         if isinstance(timeout_config, dict):
             # 细粒度超时配置
@@ -90,6 +91,7 @@ class LLMProvider(LLMProviderBase):
 
     def response(self, session_id, dialogue, **kwargs):
         dialogue = self.normalize_dialogue(dialogue)
+        llm_start = time.time()
 
         request_params = {
             "model": self.model_name,
@@ -113,9 +115,11 @@ class LLMProvider(LLMProviderBase):
         self._apply_thinking_disabled(request_params)
 
         responses = self.client.chat.completions.create(**request_params)
+        logger.bind(tag=TAG).info(f"[耗时] LLM API请求建立: {time.time() - llm_start:.3f}s")
 
         is_active = True
-        try:            
+        first_token_time = None
+        try:
             for chunk in responses:
                 try:
                     delta = chunk.choices[0].delta if getattr(chunk, "choices", None) else None
@@ -123,12 +127,15 @@ class LLMProvider(LLMProviderBase):
                 except IndexError:
                     content = ""
                 if content:
-                    if "<think>" in content:
+                    if first_token_time is None:
+                        first_token_time = time.time()
+                        logger.bind(tag=TAG).info(f"[耗时] LLM首token: {first_token_time - llm_start:.3f}s")
+                    if "␎" in content:
                         is_active = False
-                        content = content.split("<think>")[0]
-                    if "</think>" in content:
+                        content = content.split("␎")[0]
+                    if "螋" in content:
                         is_active = True
-                        content = content.split("</think>")[-1]
+                        content = content.split("螋")[-1]
                     if is_active:
                         yield content
         finally:
@@ -136,6 +143,7 @@ class LLMProvider(LLMProviderBase):
 
     def response_with_functions(self, session_id, dialogue, functions=None, **kwargs):
         dialogue = self.normalize_dialogue(dialogue)
+        llm_start = time.time()
 
         request_params = {
             "model": self.model_name,
@@ -159,13 +167,18 @@ class LLMProvider(LLMProviderBase):
         self._apply_thinking_disabled(request_params)
 
         stream = self.client.chat.completions.create(**request_params)
+        logger.bind(tag=TAG).info(f"[耗时] LLM API请求建立(function_call): {time.time() - llm_start:.3f}s")
 
+        first_token_time = None
         try:
             for chunk in stream:
                 if getattr(chunk, "choices", None):
                     delta = chunk.choices[0].delta
                     content = getattr(delta, "content", "")
                     tool_calls = getattr(delta, "tool_calls", None)
+                    if content and first_token_time is None:
+                        first_token_time = time.time()
+                        logger.bind(tag=TAG).info(f"[耗时] LLM首token: {first_token_time - llm_start:.3f}s")
                     yield content, tool_calls
                 elif isinstance(getattr(chunk, "usage", None), CompletionUsage):
                     usage_info = getattr(chunk, "usage", None)

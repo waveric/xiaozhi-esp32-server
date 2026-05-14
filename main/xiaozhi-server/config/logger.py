@@ -1,7 +1,7 @@
 import os
 import sys
 from loguru import logger
-from config.config_loader import load_config
+from config.config_loader import load_config, get_project_dir
 from config.settings import check_config_file
 from datetime import datetime
 
@@ -76,6 +76,12 @@ def setup_logging():
         log_dir = log_config.get("log_dir", "tmp")
         log_file = log_config.get("log_file", "server.log")
         data_dir = log_config.get("data_dir", "data")
+
+        # 支持绝对路径
+        if not os.path.isabs(log_dir):
+            log_dir = os.path.join(get_project_dir(), log_dir)
+        if not os.path.isabs(data_dir):
+            data_dir = os.path.join(get_project_dir(), data_dir)
 
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(data_dir, exist_ok=True)

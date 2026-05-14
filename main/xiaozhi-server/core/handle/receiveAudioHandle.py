@@ -37,6 +37,7 @@ async def resume_vad_detection(conn: "ConnectionHandler"):
 
 
 async def startToChat(conn: "ConnectionHandler", text):
+    start_time = time.time()
     # 检查输入是否是JSON格式（包含说话人信息）
     speaker_name = None
     language_tag = None
@@ -79,6 +80,8 @@ async def startToChat(conn: "ConnectionHandler", text):
     # manual 模式下不打断正在播放的内容
     if conn.client_is_speaking and conn.client_listen_mode != "manual":
         await handleAbortMessage(conn)
+
+    conn.logger.bind(tag=TAG).info(f"[耗时] ASR识别完成，开始意图分析: {time.time() - start_time:.3f}s")
 
     # 首先进行意图分析，使用实际文本内容
     intent_handled = await handle_user_intent(conn, actual_text)

@@ -1,8 +1,13 @@
 import os
 import uuid
+import time
 import edge_tts
 from datetime import datetime
+from config.logger import setup_logging
 from core.providers.tts.base import TTSProviderBase
+
+TAG = __name__
+logger = setup_logging()
 
 
 class TTSProvider(TTSProviderBase):
@@ -21,6 +26,7 @@ class TTSProvider(TTSProviderBase):
         )
 
     async def text_to_speak(self, text, output_file):
+        tts_start = time.time()
         try:
             communicate = edge_tts.Communicate(text, voice=self.voice)
             if output_file:
@@ -34,12 +40,14 @@ class TTSProvider(TTSProviderBase):
                     async for chunk in communicate.stream():
                         if chunk["type"] == "audio":  # 只处理音频数据块
                             f.write(chunk["data"])
+                logger.bind(tag=TAG).info(f"[耗时] TTS生成: {time.time() - tts_start:.3f}s | 文本长度: {len(text)}")
             else:
                 # 返回音频二进制数据
                 audio_bytes = b""
                 async for chunk in communicate.stream():
                     if chunk["type"] == "audio":
                         audio_bytes += chunk["data"]
+                logger.bind(tag=TAG).info(f"[耗时] TTS生成: {time.time() - tts_start:.3f}s | 文本长度: {len(text)}")
                 return audio_bytes
         except Exception as e:
             error_msg = f"Edge TTS请求失败: {e}"
