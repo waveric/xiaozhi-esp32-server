@@ -52,16 +52,24 @@ def _fetch_character_by_name(character_name: str):
 
 def _build_switch_character_description():
     """构建 switch_character 的 function description，包含可用角色列表"""
-    characters = _fetch_characters()
-    character_names = [char.get("name", "") for char in characters if char.get("name")]
+    # 延迟获取角色列表，避免模块加载时依赖 lightning-tools
+    try:
+        characters = _fetch_characters()
+        character_names = [char.get("name", "") for char in characters if char.get("name")]
 
-    if character_names:
-        available_chars = "、".join(character_names)
-        description = (
-            f"切换助手角色/性格。可用角色：[{available_chars}]。"
-            f"当用户想切换角色、改变性格、或想让我扮演特定角色时调用。"
-        )
-    else:
+        if character_names:
+            available_chars = "、".join(character_names)
+            description = (
+                f"切换助手角色/性格。可用角色：[{available_chars}]。"
+                f"当用户想切换角色、改变性格、或想让我扮演特定角色时调用。"
+            )
+        else:
+            description = (
+                "切换助手角色/性格。"
+                "当用户想切换角色、改变性格、或想让我扮演特定角色时调用。"
+            )
+    except Exception as e:
+        logger.bind(tag=TAG).warning(f"构建角色描述时获取角色列表失败: {e}")
         description = (
             "切换助手角色/性格。"
             "当用户想切换角色、改变性格、或想让我扮演特定角色时调用。"
@@ -86,8 +94,25 @@ def _build_switch_character_description():
     }
 
 
-# 动态生成 description
-switch_character_function_desc = _build_switch_character_description()
+# 使用默认描述，避免模块加载时依赖 lightning-tools
+# 实际调用时会动态获取角色列表
+switch_character_function_desc = {
+    "type": "function",
+    "function": {
+        "name": "switch_character",
+        "description": "切换助手角色/性格。当用户想切换角色、改变性格、或想让我扮演特定角色时调用。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "character_name": {
+                    "type": "string",
+                    "description": "要切换的角色名称",
+                }
+            },
+            "required": ["character_name"],
+        },
+    },
+}
 
 list_characters_function_desc = {
     "type": "function",
@@ -127,9 +152,29 @@ def switch_character(conn: "ConnectionHandler", character_name: str):
 
         # 2. 切换 TTS 音色
         voice = character.get("voice")
-        if voice and hasattr(conn, "tts") and conn.tts:
-            conn.tts.voice = voice
-            logger.bind(tag=TAG).info(f"已切换 TTS 音色: {voice}")
+        if voice:
+            # 确保 TTS 已初始化
+            if hasattr(conn, "tts") and conn.tts is not None:
+                conn.tts.voice = voice
+                logger.bind(tag=TAG).info(f"已切换 TTS 音色: {voice}")
+            else:
+                # TTS 尚未初始化，调用初始化
+                logger.bind(tag=TAG).info(f"TTS 尚未初始化，正在初始化...")
+                try:
+                    tts = conn._initialize_tts()
+                    if tts:
+                        tts.voice = voice
+                        conn.tts = tts
+                        # 打开音频通道
+                        import asyncio
+                        asyncio.run_coroutine_threadsafe(
+                            tts.open_audio_channels(conn), conn.loop
+                        )
+                        logger.bind(tag=TAG).info(f"已初始化 TTS 并切换音色: {voice}")
+                    else:
+                        logger.bind(tag=TAG).warning(f"TTS 初始化失败，无法切换音色")
+                except Exception as e:
+                    logger.bind(tag=TAG).error(f"初始化 TTS 失败: {e}")
 
         # 3. 使用 prompt_manager.build_enhanced_prompt() 渲染完整 prompt
         system_prompt = character.get("system_prompt", "")
