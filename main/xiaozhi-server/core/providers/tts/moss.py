@@ -63,6 +63,9 @@ class TTSProvider(TTSProviderBase):
             data = aiohttp.FormData()
             data.add_field("text", text)
             data.add_field("voice", voice)
+            # 方案A：请求服务端重采样到 ESP32 目标采样率，避免客户端重采样引入失真
+            if self.conn and hasattr(self.conn, 'sample_rate'):
+                data.add_field("target_sample_rate", str(self.conn.sample_rate))
 
             async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=self.tts_timeout)) as resp:
                 if resp.status != 200:
@@ -84,6 +87,9 @@ class TTSProvider(TTSProviderBase):
         async with aiohttp.ClientSession() as session:
             data = aiohttp.FormData()
             data.add_field("text", text)
+            # 方案A：请求服务端重采样到 ESP32 目标采样率
+            if self.conn and hasattr(self.conn, 'sample_rate'):
+                data.add_field("target_sample_rate", str(self.conn.sample_rate))
             with open(prompt_audio, "rb") as f:
                 data.add_field("prompt_audio", f, filename=os.path.basename(prompt_audio))
 

@@ -136,14 +136,25 @@ class TTSProviderBase(ABC):
                     if audio_bytes:
                         # 使用原始文本用于显示/上报
                         self.tts_audio_queue.put((SentenceType.FIRST, None, original_text, getattr(self, 'current_sentence_id', None)))
+
+                        # 方案D：先收集所有 Opus 帧，再一次性发送（减少机器感）
+                        opus_frames = []
+                        def collect_frame(frame):
+                            opus_frames.append(frame)
+
                         audio_bytes_to_data_stream(
                             audio_bytes,
                             file_type=self.audio_file_type,
                             is_opus=True,
-                            callback=opus_handler,
+                            callback=collect_frame,  # 先收集
                             sample_rate=self.conn.sample_rate,
                             opus_encoder=self.opus_encoder,
                         )
+
+                        # 一次性发送所有帧
+                        logger.bind(tag=TAG).debug(f"批量发送 {len(opus_frames)} 个 Opus 帧")
+                        for frame in opus_frames:
+                            opus_handler(frame)
                         break
                     else:
                         max_repeat_time -= 1
@@ -528,12 +539,22 @@ class TTSProviderBase(ABC):
             tts_file: 音频文件路径
             callback: 文件处理函数
         """
+        # 方案D：先收集所有帧，再一次性发送（减少机器感）
+        audio_frames = []
+        def collect_frame(frame):
+            audio_frames.append(frame)
+
         if tts_file.endswith(".p3"):
-            p3.decode_opus_from_file_stream(tts_file, callback=callback)
+            p3.decode_opus_from_file_stream(tts_file, callback=collect_frame)
         elif self.conn.audio_format == "pcm":
-            self.audio_to_pcm_data_stream(tts_file, callback=callback)
+            self.audio_to_pcm_data_stream(tts_file, callback=collect_frame)
         else:
-            self.audio_to_opus_data_stream(tts_file, callback=callback)
+            self.audio_to_opus_data_stream(tts_file, callback=collect_frame)
+
+        # 一次性发送所有帧
+        logger.bind(tag=TAG).debug(f"批量发送 {len(audio_frames)} 个音频帧 (文件: {tts_file})")
+        for frame in audio_frames:
+            callback(frame)
 
         if (
             self.delete_audio_file
