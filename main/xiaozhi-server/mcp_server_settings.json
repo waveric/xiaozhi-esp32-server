@@ -51,6 +51,11 @@
         "Authorization": "Bearer YOUR TOKEN"
       },
       "des": "使用Streamable HTTP传输模式，适用于生产环境的Web部署"
+    },
+    "lightning-tools": {
+      "url": "http://localhost:8080/mcp",
+      "transport": "streamable-http",
+      "des": "闪电工具服务：记忆/故事库/词汇/经历管理"
     }
   }
 }
