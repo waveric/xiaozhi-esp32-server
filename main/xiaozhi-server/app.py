@@ -11,6 +11,9 @@ from core.websocket_server import WebSocketServer
 from core.utils.util import check_ffmpeg_installed
 from core.utils.gc_manager import get_gc_manager
 
+# Lightning Tools FastAPI 集成
+from core.lightning.app import create_app as create_lightning_app
+
 TAG = __name__
 logger = setup_logging()
 
@@ -51,14 +54,14 @@ async def main():
     # auth_key用于jwt认证，比如视觉分析接口的jwt认证、ota接口的token生成与websocket认证
     # 获取配置文件中的auth_key
     auth_key = config["server"].get("auth_key", "")
-    
+
     # 验证auth_key，无效则尝试使用manager-api.secret
     if not auth_key or len(auth_key) == 0 or "你" in auth_key:
         auth_key = config.get("manager-api", {}).get("secret", "")
         # 验证secret，无效则生成随机密钥
         if not auth_key or len(auth_key) == 0 or "你" in auth_key:
             auth_key = str(uuid.uuid4().hex)
-    
+
     config["server"]["auth_key"] = auth_key
 
     # 添加 stdin 监控任务
@@ -67,6 +70,20 @@ async def main():
     # 启动全局GC管理器（5分钟清理一次）
     gc_manager = get_gc_manager(interval_seconds=300)
     await gc_manager.start()
+
+    # ===== 启动 Lightning Tools FastAPI (端口 8080) =====
+    import uvicorn
+    lightning_app = create_lightning_app()
+    lightning_config = uvicorn.Config(
+        lightning_app,
+        host="0.0.0.0",
+        port=8080,
+        log_level="warning",  # 降低日志级别避免刷屏
+        access_log=False,     # 关闭访问日志
+    )
+    lightning_server = uvicorn.Server(lightning_config)
+    lightning_task = asyncio.create_task(lightning_server.serve())
+    logger.bind(tag=TAG).info("Lightning Admin 管理界面是\thttp://{}:8080/admin/", get_local_ip())
 
     # 启动 WebSocket 服务器
     ws_server = WebSocketServer(config)
@@ -135,10 +152,14 @@ async def main():
         ws_task.cancel()
         if ota_task:
             ota_task.cancel()
+        lightning_task.cancel()
 
         # 等待任务终止（必须加超时）
+        tasks_to_wait = [stdin_task, ws_task, lightning_task]
+        if ota_task:
+            tasks_to_wait.append(ota_task)
         await asyncio.wait(
-            [stdin_task, ws_task, ota_task] if ota_task else [stdin_task, ws_task],
+            tasks_to_wait,
             timeout=3.0,
             return_when=asyncio.ALL_COMPLETED,
         )
