@@ -1,0 +1,638 @@
+{% extends "base.html" %}
+
+{% block title %}配置管理{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>配置管理</h1>
+        <p>管理服务配置：切换配置文件、编辑 Provider 设置、系统提示词</p>
+    </div>
+</div>
+
+<!-- 配置文件切换区域 -->
+<div class="card config-switcher">
+    <div class="config-switcher-header">
+        <div class="form-group" style="margin-bottom: 0; flex: 1;">
+            <label for="config-select">当前配置文件</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <select id="config-select" style="flex: 1;">
+                    <option value="">加载中...</option>
+                </select>
+                <button id="btn-reset-default" class="btn btn-ghost" onclick="resetToDefault()" title="恢复到默认配置（只读）">
+                    默认配置
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="config-status" class="config-status"></div>
+</div>
+
+<!-- Provider 配置区域 -->
+<div class="card">
+    <h3 style="margin-bottom: 1rem; font-size: 1rem;">Provider 设置</h3>
+
+    <div class="provider-grid">
+        <!-- ASR -->
+        <div class="provider-item">
+            <div class="form-group">
+                <label for="asr-select">语音识别 (ASR)</label>
+                <select id="asr-select" onchange="onProviderChange('ASR')">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            <div id="asr-params" class="provider-params"></div>
+        </div>
+
+        <!-- TTS -->
+        <div class="provider-item">
+            <div class="form-group">
+                <label for="tts-select">语音合成 (TTS)</label>
+                <select id="tts-select" onchange="onProviderChange('TTS')">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            <div id="tts-params" class="provider-params"></div>
+        </div>
+
+        <!-- LLM -->
+        <div class="provider-item">
+            <div class="form-group">
+                <label for="llm-select">大语言模型 (LLM)</label>
+                <select id="llm-select" onchange="onProviderChange('LLM')">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            <div id="llm-params" class="provider-params"></div>
+        </div>
+
+        <!-- VAD -->
+        <div class="provider-item">
+            <div class="form-group">
+                <label for="vad-select">语音活动检测 (VAD)</label>
+                <select id="vad-select" onchange="onProviderChange('VAD')">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            <div id="vad-params" class="provider-params"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 系统提示词 -->
+<div class="card">
+    <div class="form-group">
+        <label for="system-prompt">系统提示词</label>
+        <p style="font-size:.8rem; color:var(--color-text-secondary); margin-bottom:8px;">
+            定义 AI 的基本人格和行为准则。修改后需要重启服务生效。
+        </p>
+        <textarea id="system-prompt" style="min-height:180px; font-size:.95rem; line-height:1.8;"
+            placeholder="系统提示词..."></textarea>
+    </div>
+</div>
+
+<!-- 操作按钮 -->
+<div class="card config-actions">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div id="action-status" style="font-size: .875rem; color: var(--color-text-muted);"></div>
+        <div style="display: flex; gap: 8px;">
+            <button id="btn-save" class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+            <button id="btn-restart" class="btn btn-danger" onclick="restartService()">重启服务</button>
+        </div>
+    </div>
+</div>
+
+<!-- 重启进度对话框 -->
+<div id="restart-modal" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 400px;">
+        <h2 id="restart-title">正在重启服务...</h2>
+        <div id="restart-progress">
+            <div class="restart-spinner"></div>
+            <p style="text-align: center; color: var(--color-text-secondary); margin-top: 1rem;">
+                请稍候，服务正在重启中...
+            </p>
+        </div>
+        <div id="restart-result" style="display: none;">
+            <p id="restart-result-text"></p>
+            <details style="margin-top: 1rem;">
+                <summary style="cursor: pointer; font-size: .875rem; color: var(--color-text-secondary);">
+                    查看重启日志
+                </summary>
+                <pre id="restart-log" style="margin-top: .5rem; padding: .75rem; background: var(--color-bg); border-radius: var(--radius); font-size: .75rem; max-height: 200px; overflow: auto; white-space: pre-wrap;"></pre>
+            </details>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeRestartModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.config-switcher {
+    margin-bottom: 1rem;
+}
+
+.config-switcher-header {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
+.config-status {
+    margin-top: .75rem;
+    padding: .5rem .75rem;
+    background: var(--color-primary-light);
+    border-radius: var(--radius);
+    font-size: .8rem;
+    color: var(--color-text-secondary);
+}
+
+.config-status.warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.config-status.readonly {
+    background: #f1f5f9;
+    color: var(--color-text-muted);
+}
+
+.provider-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.provider-item {
+    padding: .75rem;
+    background: var(--color-bg);
+    border-radius: var(--radius);
+}
+
+.provider-params {
+    margin-top: .5rem;
+    font-size: .8rem;
+    color: var(--color-text-secondary);
+}
+
+.provider-params .param-row {
+    display: flex;
+    justify-content: space-between;
+    padding: .25rem 0;
+    border-bottom: 1px dashed var(--color-border);
+}
+
+.provider-params .param-row:last-child {
+    border-bottom: none;
+}
+
+.provider-params .param-key {
+    font-weight: 500;
+}
+
+.provider-params .param-value {
+    color: var(--color-text-muted);
+    font-family: monospace;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.config-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-surface);
+    box-shadow: 0 -2px 8px rgba(0,0,0,.05);
+}
+
+/* 禁用状态样式 */
+.disabled-section select,
+.disabled-section textarea,
+.disabled-section input {
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+}
+
+.disabled-section .btn {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+/* 重启进度 spinner */
+.restart-spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto;
+    border: 3px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* API Key 脱敏显示 */
+.api-key-masked {
+    font-family: monospace;
+    letter-spacing: 2px;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 全局状态
+let currentConfig = null;
+let configsList = [];
+let isDefaultConfig = false;
+
+// Provider 名称映射
+const PROVIDER_NAMES = {
+    ASR: {
+        FunASR: 'FunASR (本地)',
+        FunASRServer: 'FunASR Server',
+        AliyunASR: '阿里云 ASR',
+        AliyunStreamASR: '阿里云流式 ASR'
+    },
+    TTS: {
+        MossTTS: 'MOSS-TTS (本地)',
+        EdgeTTS: 'Edge TTS',
+        AliyunTTS: '阿里云 TTS',
+        AliyunStreamTTS: '阿里云流式 TTS',
+        AliBLTTS: '阿里百炼 TTS'
+    },
+    LLM: {
+        ChatGLMLLM: '智谱 AI (免费)',
+        DeepSeekLLM: 'DeepSeek',
+        AliLLM: '通义千问'
+    },
+    VAD: {
+        SileroVAD: 'Silero VAD'
+    }
+};
+
+// 初始化页面
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadConfigsList();
+    await loadCurrentConfig();
+});
+
+// 加载配置文件列表
+async function loadConfigsList() {
+    try {
+        const res = await api('GET', '/admin/api/config/list');
+        if (res.success) {
+            configsList = res.configs;
+            renderConfigSelect();
+        }
+    } catch (err) {
+        showToast('加载配置列表失败: ' + err.message);
+    }
+}
+
+// 渲染配置选择器
+function renderConfigSelect() {
+    const select = document.getElementById('config-select');
+    select.innerHTML = '';
+
+    configsList.forEach(cfg => {
+        const option = document.createElement('option');
+        option.value = cfg.name;
+        option.textContent = cfg.name + (cfg.is_default ? ' (默认)' : '') + (cfg.is_active ? ' ✓' : '');
+        option.dataset.isDefault = cfg.is_default || false;
+        option.dataset.isActive = cfg.is_active || false;
+        select.appendChild(option);
+    });
+
+    // 选中当前激活的配置
+    const activeConfig = configsList.find(c => c.is_active);
+    if (activeConfig) {
+        select.value = activeConfig.name;
+        isDefaultConfig = activeConfig.is_default || false;
+        updateReadOnlyState();
+    }
+}
+
+// 加载当前配置
+async function loadCurrentConfig() {
+    try {
+        const res = await api('GET', '/admin/api/config');
+        if (res.success) {
+            currentConfig = res.config;
+            renderProviderSelects();
+            renderSystemPrompt();
+            updateConfigStatus();
+        }
+    } catch (err) {
+        showToast('加载配置失败: ' + err.message);
+    }
+}
+
+// 渲染 Provider 选择器
+function renderProviderSelects() {
+    const selected = currentConfig.selected_module || {};
+
+    // ASR
+    renderSelect('asr-select', 'ASR', selected.ASR);
+    renderProviderParams('ASR', selected.ASR);
+
+    // TTS
+    renderSelect('tts-select', 'TTS', selected.TTS);
+    renderProviderParams('TTS', selected.TTS);
+
+    // LLM
+    renderSelect('llm-select', 'LLM', selected.LLM);
+    renderProviderParams('LLM', selected.LLM);
+
+    // VAD
+    renderSelect('vad-select', 'VAD', selected.VAD);
+    renderProviderParams('VAD', selected.VAD);
+}
+
+// 渲染单个选择器
+function renderSelect(selectId, moduleType, selectedValue) {
+    const select = document.getElementById(selectId);
+    const providers = currentConfig[moduleType] || {};
+    const names = PROVIDER_NAMES[moduleType] || {};
+
+    select.innerHTML = '';
+
+    Object.keys(providers).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = names[name] || name;
+        if (name === selectedValue) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+}
+
+// 渲染 Provider 参数
+function renderProviderParams(moduleType, selectedName) {
+    const paramsDiv = document.getElementById(moduleType.toLowerCase() + '-params');
+    const providers = currentConfig[moduleType] || {};
+    const provider = providers[selectedName] || {};
+
+    let html = '';
+    const displayKeys = ['model_name', 'voice', 'url', 'base_url', 'server_url', 'host', 'port'];
+
+    displayKeys.forEach(key => {
+        if (provider[key] !== undefined) {
+            let value = provider[key];
+            // API Key 脱敏
+            if (key.includes('api_key') || key.includes('token')) {
+                value = maskApiKey(value);
+            }
+            html += `
+                <div class="param-row">
+                    <span class="param-key">${key}</span>
+                    <span class="param-value ${key.includes('api_key') ? 'api-key-masked' : ''}">${escapeHtml(String(value))}</span>
+                </div>
+            `;
+        }
+    });
+
+    paramsDiv.innerHTML = html || '<div style="color: var(--color-text-muted);">无参数</div>';
+}
+
+// API Key 脱敏
+function maskApiKey(key) {
+    if (!key || key.length < 8) return key;
+    return key.substring(0, 4) + '****' + key.substring(key.length - 4);
+}
+
+// HTML 转义
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// 渲染系统提示词
+function renderSystemPrompt() {
+    const prompt = currentConfig.prompt || '';
+    document.getElementById('system-prompt').value = prompt;
+}
+
+// 更新配置状态提示
+function updateConfigStatus() {
+    const statusDiv = document.getElementById('config-status');
+
+    if (isDefaultConfig) {
+        statusDiv.className = 'config-status readonly';
+        statusDiv.textContent = '当前使用默认配置 (config.yaml)，此配置为只读。如需修改，请新建用户配置。';
+    } else {
+        statusDiv.className = 'config-status';
+        statusDiv.textContent = '当前使用用户配置，修改后需要重启服务才能生效。';
+    }
+}
+
+// 更新只读状态
+function updateReadOnlyState() {
+    const selects = document.querySelectorAll('.provider-grid select');
+    const textarea = document.getElementById('system-prompt');
+    const saveBtn = document.getElementById('btn-save');
+
+    if (isDefaultConfig) {
+        selects.forEach(s => s.disabled = true);
+        textarea.disabled = true;
+        saveBtn.disabled = true;
+        saveBtn.title = '默认配置不可编辑，请切换到用户配置';
+    } else {
+        selects.forEach(s => s.disabled = false);
+        textarea.disabled = false;
+        saveBtn.disabled = false;
+        saveBtn.title = '';
+    }
+}
+
+// Provider 选择变化
+function onProviderChange(moduleType) {
+    const selectId = moduleType.toLowerCase() + '-select';
+    const select = document.getElementById(selectId);
+    const selectedName = select.value;
+
+    renderProviderParams(moduleType, selectedName);
+}
+
+// 切换配置文件
+async function switchConfig() {
+    const select = document.getElementById('config-select');
+    const filename = select.value;
+
+    if (!filename) return;
+
+    // 检查是否是默认配置
+    const selectedOption = select.options[select.selectedIndex];
+    isDefaultConfig = selectedOption.dataset.isDefault === 'true';
+
+    if (isDefaultConfig) {
+        // 重置到默认配置
+        await resetToDefault();
+        return;
+    }
+
+    try {
+        const res = await api('POST', '/admin/api/config/switch', { filename });
+        if (res.success) {
+            showToast('配置已切换，需要重启服务生效');
+            isDefaultConfig = false;
+            updateReadOnlyState();
+            updateConfigStatus();
+            await loadCurrentConfig();
+        } else {
+            showToast('切换失败: ' + res.error);
+        }
+    } catch (err) {
+        showToast('切换配置失败: ' + err.message);
+    }
+}
+
+// 重置为默认配置
+async function resetToDefault() {
+    try {
+        const res = await api('POST', '/admin/api/config/reset');
+        if (res.success) {
+            showToast('已重置为默认配置，需要重启服务生效');
+            isDefaultConfig = true;
+            updateReadOnlyState();
+            updateConfigStatus();
+            await loadCurrentConfig();
+        } else {
+            showToast('重置失败: ' + res.error);
+        }
+    } catch (err) {
+        showToast('重置配置失败: ' + err.message);
+    }
+}
+
+// 保存配置
+async function saveConfig() {
+    if (isDefaultConfig) {
+        showToast('默认配置不可编辑');
+        return;
+    }
+
+    const updates = {
+        selected_module: {
+            ASR: document.getElementById('asr-select').value,
+            TTS: document.getElementById('tts-select').value,
+            LLM: document.getElementById('llm-select').value,
+            VAD: document.getElementById('vad-select').value
+        },
+        prompt: document.getElementById('system-prompt').value
+    };
+
+    try {
+        const res = await api('POST', '/admin/api/config/update', updates);
+        if (res.success) {
+            showToast('配置已保存，需要重启服务生效');
+            document.getElementById('action-status').textContent = '配置已保存，待重启生效';
+        } else {
+            showToast('保存失败: ' + res.error);
+        }
+    } catch (err) {
+        showToast('保存配置失败: ' + err.message);
+    }
+}
+
+// 重启服务
+async function restartService() {
+    showRestartModal();
+
+    try {
+        const res = await api('POST', '/admin/api/config/restart');
+        if (res.success) {
+            // 开始轮询重启结果
+            pollRestartResult();
+        } else {
+            showRestartResult(false, res.error);
+        }
+    } catch (err) {
+        showRestartResult(false, err.message);
+    }
+}
+
+// 显示重启对话框
+function showRestartModal() {
+    const modal = document.getElementById('restart-modal');
+    modal.style.display = 'flex';
+    document.getElementById('restart-progress').style.display = 'block';
+    document.getElementById('restart-result').style.display = 'none';
+    document.getElementById('restart-title').textContent = '正在重启服务...';
+}
+
+// 显示重启结果
+function showRestartResult(success, message) {
+    document.getElementById('restart-progress').style.display = 'none';
+    document.getElementById('restart-result').style.display = 'block';
+    document.getElementById('restart-title').textContent = success ? '重启成功' : '重启失败';
+
+    const resultText = document.getElementById('restart-result-text');
+    resultText.textContent = message;
+    resultText.style.color = success ? 'var(--color-success)' : 'var(--color-danger)';
+}
+
+// 轮询重启结果
+async function pollRestartResult() {
+    let attempts = 0;
+    const maxAttempts = 30; // 最多轮询 30 次 (30秒)
+
+    const poll = async () => {
+        attempts++;
+        try {
+            const res = await api('GET', '/admin/api/config/restart-result');
+            if (res.success) {
+                showRestartResult(true, '服务已成功重启');
+                // 刷新页面以加载新配置
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else if (attempts >= maxAttempts) {
+                showRestartResult(false, '重启超时，请检查服务状态');
+            } else {
+                setTimeout(poll, 1000);
+            }
+        } catch (err) {
+            // 服务可能正在重启，继续轮询
+            if (attempts >= maxAttempts) {
+                showRestartResult(false, '重启超时，请检查服务状态');
+                loadRestartLog();
+            } else {
+                setTimeout(poll, 1000);
+            }
+        }
+    };
+
+    setTimeout(poll, 2000); // 等待 2 秒后开始轮询
+}
+
+// 加载重启日志
+async function loadRestartLog() {
+    try {
+        const res = await api('GET', '/admin/api/config/restart-log');
+        document.getElementById('restart-log').textContent = res.log || '无日志';
+    } catch (err) {
+        document.getElementById('restart-log').textContent = '无法加载日志';
+    }
+}
+
+// 关闭重启对话框
+function closeRestartModal() {
+    document.getElementById('restart-modal').style.display = 'none';
+}
+
+// 配置选择器变化事件
+document.getElementById('config-select').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    isDefaultConfig = selectedOption.dataset.isDefault === 'true';
+    updateReadOnlyState();
+    updateConfigStatus();
+});
+</script>
+{% endblock %}

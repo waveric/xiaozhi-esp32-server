@@ -334,6 +334,11 @@ def create_app(chat_monitor=None) -> FastAPI:
         """聊天监控页面"""
         return templates.TemplateResponse(request, "chat_monitor.html")
 
+    @app.get("/admin/config")
+    async def admin_config(request: Request, _: Optional[str] = Depends(auth_dependency)):
+        """配置管理页面"""
+        return templates.TemplateResponse(request, "config.html")
+
     # ===== WebSocket 端点 =====
 
     @app.websocket("/admin/ws/chat")
