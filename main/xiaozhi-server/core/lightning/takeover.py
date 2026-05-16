@@ -46,7 +46,7 @@ class TakeoverManager:
         self.active_sessions.add(session_id)
         return {"success": True, "session_id": session_id}
 
-    def disable(self, session_id: str) -> dict:
+    async def disable(self, session_id: str) -> dict:
         """关闭接管模式
 
         Args:
@@ -56,6 +56,17 @@ class TakeoverManager:
             dict: {"success": True, "session_id": session_id}
         """
         self.active_sessions.discard(session_id)
+
+        # 触发上下文压缩检查（切回 LLM 模式时压缩过长的对话）
+        handler = self.chat_monitor.get_handler(session_id)
+        if handler and hasattr(handler, 'context_compressor') and handler.context_compressor:
+            if handler.context_compressor.check_and_compress(handler.dialogue, handler.llm):
+                try:
+                    await handler.context_compressor.compress(handler.dialogue, handler.llm)
+                except Exception as e:
+                    # 压缩失败不影响 disable 流程
+                    pass
+
         return {"success": True, "session_id": session_id}
 
     def is_active(self, session_id: str) -> bool:

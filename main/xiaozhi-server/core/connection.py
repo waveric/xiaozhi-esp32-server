@@ -197,6 +197,9 @@ class ConnectionHandler:
         # TakeoverManager 接管管理器（由 app.py 注入）
         self.takeover_manager = None
 
+        # ContextCompressor 上下文压缩器（由 app.py 注入）
+        self.context_compressor = None
+
     async def handle_connection(self, ws: websockets.ServerConnection):
         try:
             # 获取运行中的事件循环（必须在异步上下文中）
@@ -1019,6 +1022,21 @@ class ConnectionHandler:
                 functions.append(DIRECT_ANSWER_TOOL)
 
         response_message = []
+
+        # 上下文压缩检查（仅 depth==0 时执行，在 LLM 调用前压缩过长的对话）
+        if depth == 0 and hasattr(self, 'context_compressor') and self.context_compressor:
+            if self.context_compressor.check_and_compress(self.dialogue, self.llm):
+                self.logger.bind(tag=TAG).info("上下文超过阈值，开始压缩对话历史...")
+                try:
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.context_compressor.compress(self.dialogue, self.llm),
+                        self.loop,
+                    )
+                    # 等待压缩完成（最多30秒超时）
+                    future.result(timeout=30)
+                    self.logger.bind(tag=TAG).info("上下文压缩完成")
+                except Exception as e:
+                    self.logger.bind(tag=TAG).error(f"上下文压缩失败: {e}")
 
         # 获取记忆内容（仅 depth==0 时获取）
         # 记忆在会话初始化时已缓存，直接使用同步方法获取

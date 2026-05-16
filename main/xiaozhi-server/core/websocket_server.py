@@ -37,6 +37,7 @@ from core.utils.modules_initialize import initialize_modules
 from core.utils.util import check_vad_update, check_asr_update
 from core.lightning.chat_monitor import ChatMonitor
 from core.lightning.takeover import TakeoverManager
+from core.lightning.context_compression import ContextCompressor, CompressionConfig
 
 TAG = __name__
 
@@ -136,6 +137,12 @@ class WebSocketServer:
         handler.chat_monitor = self.chat_monitor
         # 注入 TakeoverManager
         handler.takeover_manager = self.takeover_manager
+        # 注入 ContextCompressor（上下文压缩器）
+        handler.context_compressor = ContextCompressor(CompressionConfig(
+            enabled=True,
+            threshold=0.7,
+            max_context_tokens=32768
+        ))
         # 注册 handler 以便 TakeoverManager 使用
         self.chat_monitor.register_handler(handler.session_id, handler)
         try:
