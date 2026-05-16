@@ -194,6 +194,9 @@ class ConnectionHandler:
         # ChatMonitor 分发器（由 app.py 注入）
         self.chat_monitor = None
 
+        # TakeoverManager 接管管理器（由 app.py 注入）
+        self.takeover_manager = None
+
     async def handle_connection(self, ws: websockets.ServerConnection):
         try:
             # 获取运行中的事件循环（必须在异步上下文中）
@@ -970,6 +973,9 @@ class ConnectionHandler:
             # 推送用户消息给 ChatMonitor 订阅者
             if self.chat_monitor:
                 self.chat_monitor.on_message_sync(self.session_id, "user_message", query)
+            # 接管模式：跳过 LLM+TTS，家长可在 Web UI 直接回复
+            if self.takeover_manager and self.takeover_manager.is_active(self.session_id):
+                return
             self.tts.tts_text_queue.put(
                 TTSMessageDTO(
                     sentence_id=current_sentence_id,

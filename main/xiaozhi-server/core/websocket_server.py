@@ -36,6 +36,7 @@ from core.auth import AuthManager, AuthenticationError
 from core.utils.modules_initialize import initialize_modules
 from core.utils.util import check_vad_update, check_asr_update
 from core.lightning.chat_monitor import ChatMonitor
+from core.lightning.takeover import TakeoverManager
 
 TAG = __name__
 
@@ -48,6 +49,9 @@ class WebSocketServer:
 
         # 创建 ChatMonitor 实例
         self.chat_monitor = ChatMonitor()
+
+        # 创建 TakeoverManager 实例（依赖 ChatMonitor）
+        self.takeover_manager = TakeoverManager(self.chat_monitor)
 
         modules = initialize_modules(
             self.logger,
@@ -130,6 +134,8 @@ class WebSocketServer:
         )
         # 注入 ChatMonitor
         handler.chat_monitor = self.chat_monitor
+        # 注入 TakeoverManager
+        handler.takeover_manager = self.takeover_manager
         # 注册 handler 以便 TakeoverManager 使用
         self.chat_monitor.register_handler(handler.session_id, handler)
         try:
