@@ -3,6 +3,12 @@
 {% block title %}聊天监控{% endblock %}
 
 {% block content %}
+<!-- 接管模式横幅 -->
+<div class="takeover-banner" id="takeover-banner" style="display: none;">
+    <span class="banner-icon">⚠️</span>
+    <span class="banner-text">接管模式已开启 - 您的消息将直接发送给设备</span>
+</div>
+
 <div class="chat-monitor-header">
     <div class="header-left">
         <h1>聊天监控</h1>
@@ -48,9 +54,17 @@ const WS_URL = 'ws://' + window.location.host + '/admin/ws/chat';
 
 // 接管模式状态
 let takeoverMode = false;
+let sessionId = 'default';  // 当前会话 ID
+
+// 从 URL 参数获取 session_id
+function getSessionIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('session_id') || 'default';
+}
 
 // 初始化
 function init() {
+    sessionId = getSessionIdFromUrl();
     connectWebSocket();
 }
 
@@ -276,14 +290,42 @@ function truncate(str, maxLen) {
 }
 
 // 切换接管模式
-function toggleTakeover(enabled) {
-    takeoverMode = enabled;
+async function toggleTakeover(enabled) {
+    const endpoint = enabled ? 'enable' : 'disable';
+
+    try {
+        const response = await fetch(`/admin/api/takeover/${sessionId}/${endpoint}`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            takeoverMode = enabled;
+            showTakeoverBanner(enabled);
+            showInputBox(enabled);
+            showToast(enabled ? '接管模式已开启' : '接管模式已关闭');
+        } else {
+            // API 返回失败，恢复开关状态
+            document.getElementById('takeover-toggle').checked = !enabled;
+            showToast('操作失败: ' + (result.error || '未知错误'));
+        }
+    } catch (e) {
+        console.error('接管模式切换失败:', e);
+        document.getElementById('takeover-toggle').checked = !enabled;
+        showToast('网络错误，请稍后重试');
+    }
+}
+
+// 显示/隐藏接管模式横幅
+function showTakeoverBanner(show) {
+    const banner = document.getElementById('takeover-banner');
+    banner.style.display = show ? 'flex' : 'none';
+}
+
+// 显示/隐藏输入框
+function showInputBox(show) {
     const inputArea = document.getElementById('takeover-input');
-
-    // US-016 启用后取消注释
-    // inputArea.style.display = enabled ? 'flex' : 'none';
-
-    showToast(enabled ? '接管模式已开启' : '接管模式已关闭');
+    inputArea.style.display = show ? 'flex' : 'none';
 }
 
 // 处理按键
@@ -294,14 +336,55 @@ function handleKeyPress(event) {
 }
 
 // 发送接管消息（US-016 实现）
-function sendTakeoverMessage() {
+async function sendTakeoverMessage() {
     const input = document.getElementById('takeover-message');
     const message = input.value.trim();
 
     if (!message) return;
 
-    // TODO: US-016 实现发送逻辑
-    showToast('接管功能尚未实现');
+    try {
+        const response = await fetch(`/admin/api/takeover/${sessionId}/respond`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: message})
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            // 在聊天记录中显示为 assistant 消息，标记「接管回复」
+            addTakeoverMessage(message);
+            input.value = '';
+        } else {
+            showToast('发送失败: ' + (result.error || '未知错误'));
+        }
+    } catch (e) {
+        console.error('发送接管消息失败:', e);
+        showToast('网络错误，请稍后重试');
+    }
+}
+
+// 添加接管回复消息到聊天记录
+function addTakeoverMessage(text) {
+    const container = document.getElementById('chat-messages');
+    const emptyState = document.getElementById('empty-state');
+
+    // 隐藏空状态
+    if (emptyState) {
+        emptyState.style.display = 'none';
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message-wrapper assistant takeover-message';
+    wrapper.innerHTML = `
+        <div class="message-bubble assistant-bubble">
+            <div class="message-role">助手 <span class="takeover-badge">接管回复</span></div>
+            <div class="message-content">${esc(text)}</div>
+        </div>
+    `;
+
+    container.appendChild(wrapper);
+    // 滚动到底部
+    container.scrollTop = container.scrollHeight;
 }
 
 // 初始化
@@ -309,6 +392,59 @@ init();
 </script>
 
 <style>
+/* 接管模式横幅 */
+.takeover-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: white;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.banner-icon {
+    font-size: 1.2rem;
+}
+
+.banner-text {
+    flex: 1;
+}
+
+/* 接管回复标记 */
+.takeover-badge {
+    display: inline-block;
+    background: #fbbf24;
+    color: #78350f;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+/* 接管消息样式 */
+.takeover-message .assistant-bubble {
+    border: 2px solid #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
 /* 页面头部 */
 .chat-monitor-header {
     display: flex;
