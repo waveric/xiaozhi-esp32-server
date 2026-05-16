@@ -9,8 +9,12 @@ ConfigManager - 配置文件管理核心类
 
 import yaml
 import shutil
+import subprocess
+import json
+import platform
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+from datetime import datetime
 
 
 class ConfigManager:
@@ -403,3 +407,100 @@ class ConfigManager:
                 "success": False,
                 "error": str(e)
             }
+
+    def restart(self, config_file: Optional[str] = None) -> Dict[str, Any]:
+        """重启服务（支持指定配置文件）
+
+        通过调用 scripts/restart.bat 脚本执行重启，
+        脚本会自动备份当前配置、切换配置、重启进程，
+        并在失败时自动回滚。
+
+        Args:
+            config_file: 可选，切换到指定配置文件后重启
+
+        Returns:
+            包含重启结果的字典
+        """
+        restart_log = str(self.base_dir / "data" / "restart.log")
+
+        try:
+            system = platform.system()
+
+            if system == "Windows":
+                # Windows: 调用 restart.bat
+                script_path = self.base_dir.parent / "scripts" / "restart.bat"
+                if not script_path.exists():
+                    return {
+                        "success": False,
+                        "error": f"重启脚本不存在: {script_path}"
+                    }
+
+                cmd = ["cmd", "/c", str(script_path)]
+                if config_file:
+                    cmd.append(config_file)
+
+                # 启动重启脚本（非阻塞，独立进程）
+                subprocess.Popen(
+                    cmd,
+                    cwd=str(self.base_dir.parent / "scripts"),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+
+                return {
+                    "success": True,
+                    "message": "重启脚本已启动，服务将在几秒内重启",
+                    "config_file": config_file,
+                    "platform": "windows"
+                }
+
+            else:
+                # Linux/macOS: 使用进程替换方式重启
+                import os
+                import sys
+
+                # 记录当前进程 PID
+                pid_file = self.base_dir / "data" / "xiaozhi.pid"
+                pid_file.write_text(str(os.getpid()))
+
+                return {
+                    "success": False,
+                    "error": "Linux/macOS 重启需要外部进程管理器（如 systemd/supervisor）",
+                    "platform": system
+                }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def get_restart_log(self) -> str:
+        """获取重启日志内容
+
+        Returns:
+            重启日志文本，如果日志文件不存在则返回空字符串
+        """
+        log_path = self.base_dir / "data" / "restart.log"
+        if log_path.exists():
+            try:
+                return log_path.read_text(encoding='utf-8')
+            except Exception:
+                return ""
+        return ""
+
+    def get_restart_result(self) -> Dict[str, Any]:
+        """获取最近一次重启结果
+
+        Returns:
+            重启结果字典
+        """
+        result_path = self.base_dir / "data" / "restart_result.json"
+        if result_path.exists():
+            try:
+                content = result_path.read_text(encoding='utf-8')
+                return json.loads(content)
+            except Exception:
+                return {"success": False, "error": "无法读取重启结果"}
+        return {"success": False, "error": "没有重启结果记录"}

@@ -18,6 +18,7 @@ from .database import init_db, get_memory, get_role_prompt, get_shared_memory
 from .config import AGENT_BASE_PROMPT_PATH
 from .auth import AuthManager, LoginRequest, LoginResponse, create_login_response, clear_auth_cookie
 from .takeover import TakeoverManager
+from .config_manager import ConfigManager
 
 # 路径配置
 LIGHTNING_DIR = Path(__file__).parent
@@ -163,6 +164,91 @@ def create_app(chat_monitor=None) -> FastAPI:
             "enabled": auth_manager.is_enabled(),
             "authenticated": is_authenticated
         }
+
+    # ===== 配置管理 API 路由 =====
+
+    # 创建 ConfigManager 实例
+    config_manager = ConfigManager()
+
+    @app.get("/admin/api/config")
+    async def get_config():
+        """获取当前激活的配置"""
+        try:
+            config = config_manager.get_merged_config()
+            return {"success": True, "config": config}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @app.get("/admin/api/config/list")
+    async def list_configs():
+        """列出所有可用配置文件"""
+        try:
+            configs = config_manager.list_configs()
+            return {"success": True, "configs": configs}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @app.get("/admin/api/config/{filename}")
+    async def get_config_file(filename: str):
+        """获取指定配置文件内容"""
+        try:
+            if filename == "config.yaml":
+                config = config_manager.get_default_config()
+            else:
+                config = config_manager.load_config(filename)
+            return {"success": True, "config": config, "filename": filename}
+        except FileNotFoundError:
+            return {"success": False, "error": f"配置文件不存在: {filename}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @app.post("/admin/api/config/save")
+    async def save_config(body: dict):
+        """保存配置到指定文件"""
+        filename = body.get("filename")
+        config = body.get("config")
+        if not filename or not config:
+            return {"success": False, "error": "缺少 filename 或 config 参数"}
+        return config_manager.save_config(filename, config)
+
+    @app.post("/admin/api/config/switch")
+    async def switch_config(body: dict):
+        """切换配置文件"""
+        filename = body.get("filename")
+        if not filename:
+            return {"success": False, "error": "缺少 filename 参数"}
+        return config_manager.switch_config(filename)
+
+    @app.post("/admin/api/config/reset")
+    async def reset_config():
+        """重置为默认配置"""
+        return config_manager.reset_to_default()
+
+    @app.delete("/admin/api/config/{filename}")
+    async def delete_config(filename: str):
+        """删除指定配置文件"""
+        return config_manager.delete_config(filename)
+
+    @app.post("/admin/api/config/restart")
+    async def restart_service(body: dict = None):
+        """重启服务"""
+        config_file = body.get("config_file") if body else None
+        return config_manager.restart(config_file)
+
+    @app.get("/admin/api/config/restart-log")
+    async def get_restart_log():
+        """获取重启日志"""
+        return {"log": config_manager.get_restart_log()}
+
+    @app.get("/admin/api/config/restart-result")
+    async def get_restart_result():
+        """获取最近一次重启结果"""
+        return config_manager.get_restart_result()
+
+    @app.post("/admin/api/config/update")
+    async def update_config(body: dict):
+        """更新当前激活配置的特定字段"""
+        return config_manager.update_active_config(body)
 
     # ===== 认证依赖 =====
     auth_dependency = auth_manager.get_auth_dependency()
