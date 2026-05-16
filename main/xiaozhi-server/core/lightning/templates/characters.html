@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block title %}角色管理{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>角色管理</h1>
+        <p>管理 AI 的角色设定和语音风格，可创建多个角色并切换</p>
+    </div>
+    <button class="btn btn-primary" onclick="openModal()">+ 新增角色</button>
+</div>
+
+<!-- 角色列表 -->
+<div class="table-wrapper">
+    <table id="character-table">
+        <thead>
+            <tr>
+                <th style="width:40px;">当前</th>
+                <th>名称</th>
+                <th>描述</th>
+                <th>音色</th>
+                <th>来源</th>
+                <th style="width:60px;">状态</th>
+                <th style="width:180px;">操作</th>
+            </tr>
+        </thead>
+        <tbody id="character-list">
+            <!-- 动态渲染 -->
+        </tbody>
+    </table>
+</div>
+
+<!-- 共享记忆区域 -->
+<div class="card" style="margin-top:1.5rem;">
+    <div class="form-group" style="margin-bottom:0.5rem;">
+        <label for="shared-memory">共享记忆</label>
+        <p style="font-size:.8rem; color:var(--color-text-secondary); margin-bottom:8px;">
+            所有角色共享的记忆内容，AI 在对话中会通过工具读取这些记忆
+        </p>
+        <textarea id="shared-memory" style="min-height:150px;"
+            placeholder="例如：&#10;小孩叫小明，今年5岁，喜欢恐龙和奥特曼。&#10;最近在学习认字，能认识简单的常用字。"></textarea>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="save-memory-status" style="font-size:.8rem; color:var(--color-text-muted);"></span>
+        <button class="btn btn-primary" onclick="saveSharedMemory()">保存共享记忆</button>
+    </div>
+</div>
+
+<!-- 新增/编辑模态弹窗 -->
+<div class="modal-overlay" id="modal" style="display:none;" onclick="if(event.target===this)closeModal()">
+    <div class="modal" style="max-width:600px;">
+        <h2 id="modal-title">新增角色</h2>
+        <input type="hidden" id="edit-id">
+
+        <div class="form-group">
+            <label for="char-name">名称 <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" id="char-name" placeholder="例如：闪电、小助手">
+        </div>
+
+        <div class="form-group">
+            <label for="char-desc">描述</label>
+            <input type="text" id="char-desc" placeholder="简短描述，如：活泼可爱的小狗">
+        </div>
+
+        <div class="form-group">
+            <label for="char-voice-source">音色来源</label>
+            <select id="char-voice-source" onchange="toggleVoiceSelect()">
+                <option value="builtin">内置音色</option>
+                <option value="custom">自定义音色（需上传参考音频）</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="builtin-voice-group">
+            <label for="char-voice">内置音色</label>
+            <select id="char-voice">
+                <option value="Junhao">Junhao（男声）</option>
+                <option value="Xiaoyu">Xiaoyu（女声）</option>
+                <option value="Yuewen">Yuewen（女声）</option>
+                <option value="Lingyu">Lingyu（女声）</option>
+                <option value="Zhiming">Zhiming（男声）</option>
+                <option value="Weiguo">Weiguo（男声）</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="custom-voice-group" style="display:none;">
+            <label for="char-voice-custom">自定义音色 ID</label>
+            <input type="text" id="char-voice-custom" placeholder="输入自定义音色 ID">
+            <p style="font-size:.75rem; color:var(--color-text-muted); margin-top:4px;">
+                自定义音色需要上传参考音频，创建角色后可在列表中上传
+            </p>
+        </div>
+
+        <div class="form-group">
+            <label for="char-prompt">人格设定</label>
+            <textarea id="char-prompt" style="min-height:150px;"
+                placeholder="定义角色的性格、说话风格和行为规则。&#10;&#10;例如：你是一只叫闪电的AI小狗，性格活泼可爱，喜欢和小朋友聊天。说话要简单有趣，用小朋友能听懂的语言。"></textarea>
+            <p style="font-size:.75rem; color:var(--color-text-muted); margin-top:4px;">
+                此内容会作为系统提示词的一部分，定义 AI 的人格
+            </p>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveCharacter()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 上传音频弹窗 -->
+<div class="modal-overlay" id="audio-modal" style="display:none;" onclick="if(event.target===this)closeAudioModal()">
+    <div class="modal">
+        <h2>上传参考音频</h2>
+        <input type="hidden" id="audio-char-id">
+
+        <div class="form-group">
+            <label for="audio-file">参考音频文件（WAV 格式）</label>
+            <input type="file" id="audio-file" accept=".wav,.mp3,.m4a">
+            <p style="font-size:.75rem; color:var(--color-text-muted); margin-top:4px;">
+                上传一段清晰的语音作为自定义音色的参考
+            </p>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeAudioModal()">取消</button>
+            <button class="btn btn-primary" onclick="uploadAudio()">上传</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 内置音色列表
+const BUILTIN_VOICES = ['Junhao', 'Xiaoyu', 'Yuewen', 'Lingyu', 'Zhiming', 'Weiguo'];
+
+// 当前角色 ID（用于渲染时判断高亮）
+let currentCharacterId = null;
+
+// 初始化加载
+async function init() {
+    // 先加载当前角色
+    const currentData = await api('GET', '/admin/api/character/current');
+    currentCharacterId = currentData.character?.id || null;
+
+    // 再加载角色列表
+    const charsData = await api('GET', '/admin/api/characters');
+    renderCharacters(charsData.characters || []);
+
+    // 加载共享记忆
+    loadSharedMemory();
+}
+
+// 加载共享记忆
+function loadSharedMemory() {
+    api('GET', '/admin/api/memory')
+        .then(data => {
+            document.getElementById('shared-memory').value = data.content || '';
+        });
+}
+
+// 重新加载角色列表
+function reloadCharacters() {
+    api('GET', '/admin/api/characters')
+        .then(data => renderCharacters(data.characters || []));
+}
+
+// 渲染角色列表
+function renderCharacters(items) {
+    const tbody = document.getElementById('character-list');
+    if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><p>还没有角色，点击「新增角色」创建</p></td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = items.map(c => {
+        const isBuiltin = c.is_default === 1;
+        const isActive = c.is_active !== 0;
+        const voiceSourceText = c.voice_source === 'custom' ? '自定义' : '内置';
+        const voiceText = c.voice_source === 'custom' ? (c.voice || '-') : c.voice;
+        const isCurrent = c.id === currentCharacterId;
+
+        return `
+            <tr id="char-row-${c.id}" class="${isCurrent ? 'current-character' : ''}">
+                <td>${isCurrent ? '<span style="color:var(--color-success); font-size:1.2rem;">✓</span>' : ''}</td>
+                <td><strong>${esc(c.name)}</strong></td>
+                <td>${esc(c.description) || '<span style="color:var(--color-text-muted);">-</span>'}</td>
+                <td>${esc(voiceText)}</td>
+                <td>
+                    <span class="tag ${isBuiltin ? 'tag-builtin' : 'tag-custom'}">${isBuiltin ? '内置' : '自定义'}</span>
+                </td>
+                <td>
+                    <span style="color:${isActive ? 'var(--color-success)' : 'var(--color-text-muted)'};">
+                        ${isActive ? '启用' : '禁用'}
+                    </span>
+                </td>
+                <td>
+                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                        ${!isCurrent ? `<button class="btn btn-primary btn-sm" onclick="setCurrent('${c.id}')">设为当前</button>` : ''}
+                        <button class="btn btn-ghost btn-sm" onclick='editCharacter(${JSON.stringify(c).replace(/'/g, "&#39;")})'>编辑</button>
+                        ${c.voice_source === 'custom' ? `<button class="btn btn-ghost btn-sm" onclick="openAudioModal('${c.id}')">上传音频</button>` : ''}
+                        ${isBuiltin
+                            ? (isActive
+                                ? `<button class="btn btn-danger btn-sm" onclick="toggleActive('${c.id}', 0)">禁用</button>`
+                                : `<button class="btn btn-ghost btn-sm" onclick="toggleActive('${c.id}', 1)">启用</button>`)
+                            : `<button class="btn btn-danger btn-sm" onclick="deleteCharacter('${c.id}')">删除</button>`
+                        }
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 设置当前角色
+function setCurrent(id) {
+    api('POST', '/admin/api/character/current', { voice_id: id })
+        .then(() => {
+            currentCharacterId = id;
+            showToast('已切换角色');
+            api('GET', '/admin/api/characters')
+                .then(data => renderCharacters(data.characters || []));
+        });
+}
+
+// 切换音色选择器
+function toggleVoiceSelect() {
+    const source = document.getElementById('char-voice-source').value;
+    const builtinGroup = document.getElementById('builtin-voice-group');
+    const customGroup = document.getElementById('custom-voice-group');
+
+    if (source === 'builtin') {
+        builtinGroup.style.display = 'block';
+        customGroup.style.display = 'none';
+    } else {
+        builtinGroup.style.display = 'none';
+        customGroup.style.display = 'block';
+    }
+}
+
+// 打开新增弹窗
+function openModal(char = null) {
+    document.getElementById('modal-title').textContent = char ? '编辑角色' : '新增角色';
+    document.getElementById('edit-id').value = char ? char.id : '';
+    document.getElementById('char-name').value = char ? char.name : '';
+    document.getElementById('char-desc').value = char ? (char.description || '') : '';
+    document.getElementById('char-prompt').value = char ? (char.system_prompt || '') : '';
+
+    if (char) {
+        // 编辑模式
+        if (char.voice_source === 'custom') {
+            document.getElementById('char-voice-source').value = 'custom';
+            document.getElementById('char-voice-custom').value = char.voice || '';
+        } else {
+            document.getElementById('char-voice-source').value = 'builtin';
+            // 设置内置音色选择
+            const voiceSelect = document.getElementById('char-voice');
+            if (BUILTIN_VOICES.includes(char.voice)) {
+                voiceSelect.value = char.voice;
+            }
+        }
+        toggleVoiceSelect();
+    } else {
+        // 新增模式，默认内置音色
+        document.getElementById('char-voice-source').value = 'builtin';
+        document.getElementById('char-voice').value = 'Junhao';
+        document.getElementById('char-voice-custom').value = '';
+        toggleVoiceSelect();
+    }
+
+    document.getElementById('modal').style.display = 'flex';
+}
+
+// 关闭弹窗
+function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+}
+
+// 编辑角色
+function editCharacter(char) {
+    openModal(char);
+}
+
+// 保存角色
+function saveCharacter() {
+    const id = document.getElementById('edit-id').value;
+    const name = document.getElementById('char-name').value.trim();
+    const desc = document.getElementById('char-desc').value.trim();
+    const prompt = document.getElementById('char-prompt').value.trim();
+    const voiceSource = document.getElementById('char-voice-source').value;
+    const voice = voiceSource === 'builtin'
+        ? document.getElementById('char-voice').value
+        : document.getElementById('char-voice-custom').value.trim();
+
+    if (!name) {
+        showToast('请输入角色名称');
+        return;
+    }
+
+    if (voiceSource === 'custom' && !voice) {
+        showToast('请输入自定义音色 ID');
+        return;
+    }
+
+    const data = {
+        name,
+        description: desc,
+        system_prompt: prompt,
+        voice,
+        voice_source: voiceSource
+    };
+
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/admin/api/characters/${id}` : '/admin/api/characters';
+
+    api(method, url, data)
+        .then(() => {
+            showToast(id ? '已更新' : '已添加');
+            closeModal();
+            reloadCharacters();
+        })
+        .catch(err => showToast('保存失败: ' + err.message));
+}
+
+// 删除角色
+function deleteCharacter(id) {
+    if (!confirm('确定要删除这个角色吗？')) return;
+    api('DELETE', `/admin/api/characters/${id}`)
+        .then(() => {
+            showToast('已删除');
+            reloadCharacters();
+        });
+}
+
+// 切换启用状态
+function toggleActive(id, isActive) {
+    api('PUT', `/admin/api/characters/${id}`, { is_active: isActive })
+        .then(() => {
+            showToast(isActive ? '已启用' : '已禁用');
+            reloadCharacters();
+        });
+}
+
+// 打开音频上传弹窗
+function openAudioModal(charId) {
+    document.getElementById('audio-char-id').value = charId;
+    document.getElementById('audio-file').value = '';
+    document.getElementById('audio-modal').style.display = 'flex';
+}
+
+// 关闭音频上传弹窗
+function closeAudioModal() {
+    document.getElementById('audio-modal').style.display = 'none';
+}
+
+// 上传音频
+async function uploadAudio() {
+    const charId = document.getElementById('audio-char-id').value;
+    const fileInput = document.getElementById('audio-file');
+
+    if (!fileInput.files.length) {
+        showToast('请选择音频文件');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    try {
+        const res = await fetch(`/admin/api/characters/${charId}/audio`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: '上传失败' }));
+            throw new Error(err.detail);
+        }
+
+        showToast('音频已上传');
+        closeAudioModal();
+        reloadCharacters();
+    } catch (err) {
+        showToast('上传失败: ' + err.message);
+    }
+}
+
+// 保存共享记忆
+function saveSharedMemory() {
+    const content = document.getElementById('shared-memory').value;
+    const statusEl = document.getElementById('save-memory-status');
+
+    api('PUT', '/admin/api/memory', { content })
+        .then(() => {
+            statusEl.textContent = '已保存 ✓';
+            statusEl.style.color = 'var(--color-success)';
+            setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        })
+        .catch(err => {
+            statusEl.textContent = '保存失败';
+            statusEl.style.color = 'var(--color-danger)';
+            showToast('保存失败: ' + err.message);
+        });
+}
+
+// 初始化
+init();
+</script>
+
+<style>
+/* 当前角色行高亮 */
+.current-character {
+    background-color: #ecfdf5 !important;
+}
+
+.current-character td {
+    border-bottom-color: #a7f3d0;
+}
+
+/* 内置/自定义标签颜色 */
+.tag-builtin {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.tag-custom {
+    background: #fef3c7;
+    color: #92400e;
+}
+</style>
+{% endblock %}

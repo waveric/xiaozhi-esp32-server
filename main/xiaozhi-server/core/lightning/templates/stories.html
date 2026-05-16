@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}故事库{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>故事库</h1>
+        <p>管理和浏览所有故事，支持播放音频预览</p>
+    </div>
+    <a href="/admin/stories/new" class="btn btn-primary">+ 新建故事</a>
+</div>
+
+<div class="search-bar">
+    <input type="search" id="search-input" placeholder="搜索故事标题或内容..." onkeydown="if(event.key==='Enter')loadStories()">
+    <button class="btn btn-primary" onclick="loadStories()">搜索</button>
+</div>
+
+<div id="story-list">
+    <!-- 动态渲染 -->
+</div>
+
+<div id="pagination" class="pagination"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadStories() {
+    const keyword = document.getElementById('search-input').value.trim();
+    const params = new URLSearchParams({});
+    if (keyword) params.set('keyword', keyword);
+
+    api('GET', `/admin/api/stories?${params}`)
+        .then(data => {
+            const stories = data.stories || [];
+            renderStories(stories);
+            document.getElementById('pagination').innerHTML = '';
+        });
+}
+
+function renderStories(items) {
+    const container = document.getElementById('story-list');
+    if (!items.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">📖</div><p>还没有故事，点击「新建故事」添加</p></div>';
+        return;
+    }
+
+    container.innerHTML = items.map(s => `
+        <div class="card">
+            <div class="card-title">
+                <a href="/admin/stories/${s.id}" style="color:var(--color-text);text-decoration:none;">${esc(s.title)}</a>
+            </div>
+            <div class="card-meta">
+                <span>${s.audio_segments && s.audio_segments.length > 0 ? '🎵 ' + s.audio_segments.length + '段音频' : '无音频'}</span>
+                <span>播放 ${s.play_count || 0} 次</span>
+                <span>${s.source === 'manual' ? '手动创建' : 'AI 生成'}</span>
+                ${s.rating > 0 ? '<span>' + '★'.repeat(s.rating) + '☆'.repeat(5 - s.rating) + '</span>' : ''}
+            </div>
+            ${s.tags && s.tags.length > 0 ? '<div style="margin-top:6px;">' + s.tags.map(t => `<span class="tag">${esc(t)}</span>`).join(' ') + '</div>' : ''}
+            <div class="card-actions">
+                <a href="/admin/stories/${s.id}" class="btn btn-ghost btn-sm">编辑</a>
+                <button class="btn btn-ghost btn-sm" onclick="regenerateAudio('${s.id}')">重新生成音频</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteStory('${s.id}', '${esc(s.title)}')">删除</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function deleteStory(id, title) {
+    if (!confirm(`确定要删除故事「${title}」吗？音频文件也会一起删除。`)) return;
+    api('DELETE', `/admin/api/stories/${id}`)
+        .then(() => { showToast('已删除'); loadStories(); });
+}
+
+function regenerateAudio(id) {
+    showToast('正在生成音频，请稍候...');
+    api('POST', `/admin/api/stories/${id}/regenerate-audio`)
+        .then(() => { showToast('音频已重新生成'); loadStories(); })
+        .catch(err => showToast('生成失败: ' + err.message));
+}
+
+// 初始加载
+loadStories();
+</script>
+{% endblock %}

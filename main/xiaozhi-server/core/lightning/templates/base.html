@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}闪电工具{% endblock %} - 管理面板</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="brand-icon">⚡</span>
+            <span class="brand-text">闪电工具</span>
+        </div>
+        <div class="nav-links">
+            <a href="/admin/" class="nav-link {% if active_page == 'memory' %}active{% endif %}">提示词</a>
+            <a href="/admin/characters" class="nav-link {% if active_page == 'characters' %}active{% endif %}">角色管理</a>
+            <a href="/admin/stories" class="nav-link {% if active_page == 'stories' %}active{% endif %}">故事库</a>
+            <a href="/admin/vocabulary" class="nav-link {% if active_page == 'vocabulary' %}active{% endif %}">词汇</a>
+            <a href="/admin/experiences" class="nav-link {% if active_page == 'experiences' %}active{% endif %}">经历</a>
+            <a href="/admin/history" class="nav-link {% if active_page == 'history' %}active{% endif %}">会话</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="/static/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

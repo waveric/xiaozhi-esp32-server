@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}词汇管理{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>词汇管理</h1>
+        <p>查看和管理 AI 在对话中遇到的词汇及其熟悉度，关联相关经历帮助解释</p>
+    </div>
+    <button class="btn btn-primary" onclick="openAddModal()">+ 添加词汇</button>
+</div>
+
+<div class="filter-tabs" id="filter-tabs">
+    <button class="filter-tab active" data-filter="" onclick="setFilter(this, '')">全部</button>
+    <button class="filter-tab" data-filter="unknown" onclick="setFilter(this, 'unknown')">不认识</button>
+    <button class="filter-tab" data-filter="vague" onclick="setFilter(this, 'vague')">模糊</button>
+    <button class="filter-tab" data-filter="familiar" onclick="setFilter(this, 'familiar')">熟悉</button>
+</div>
+
+<div id="vocab-list">
+    <!-- 动态渲染 -->
+</div>
+
+<div id="pagination" class="pagination"></div>
+
+<!-- 添加/编辑词汇弹窗 -->
+<div class="modal-overlay" id="edit-modal" style="display:none;" onclick="if(event.target===this)closeEditModal()">
+    <div class="modal" style="max-width:560px;">
+        <h2 id="edit-modal-title">添加词汇</h2>
+        <input type="hidden" id="edit-id">
+        <div class="form-group">
+            <label for="edit-word">词汇</label>
+            <input type="text" id="edit-word" placeholder="输入词汇">
+        </div>
+        <div class="form-group">
+            <label for="edit-familiarity">熟悉度</label>
+            <select id="edit-familiarity">
+                <option value="unknown">不认识</option>
+                <option value="vague">模糊</option>
+                <option value="familiar">熟悉</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="edit-notes">备注</label>
+            <input type="text" id="edit-notes" placeholder="家长备注，如：用恐龙举例解释过">
+        </div>
+        <div class="form-group">
+            <label>关联经历</label>
+            <p style="font-size:.75rem; color:var(--color-text-muted); margin:4px 0 8px;">
+                AI 解释这个词时会引用这些经历，用孩子亲身体验过的场景来解释更容易理解
+            </p>
+            <div id="edit-experiences" style="max-height:200px; overflow-y:auto;">
+                <!-- 动态渲染经历复选框 -->
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeEditModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveVocab()">保存</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentFilter = '';
+let allExperiences = [];
+
+// 页面加载时获取所有经历，供关联用
+api('GET', '/admin/api/experiences').then(data => {
+    allExperiences = data.experiences || [];
+});
+
+function setFilter(el, filter) {
+    document.querySelectorAll('#filter-tabs .filter-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    currentFilter = filter;
+    loadVocab();
+}
+
+function loadVocab() {
+    const params = new URLSearchParams({});
+    if (currentFilter) params.set('familiarity', currentFilter);
+
+    api('GET', `/admin/api/vocabularies?${params}`)
+        .then(data => {
+            renderVocab(data.vocabularies || []);
+            document.getElementById('pagination').innerHTML = '';
+        });
+}
+
+function renderVocab(items) {
+    const container = document.getElementById('vocab-list');
+    if (!items.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">📝</div><p>还没有词汇记录</p></div>';
+        return;
+    }
+
+    container.innerHTML = items.map(v => {
+        const linkedExps = (v.linked_experiences || []);
+        const expTags = linkedExps.map(e => `<span class="tag" style="background:#e0f2fe;color:#0369a1;">${esc(e.description.substring(0, 15))}${e.description.length > 15 ? '...' : ''}</span>`).join(' ');
+
+        return `
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                <div style="flex:1;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <span style="font-size:1.05rem; font-weight:700;">${esc(v.word)}</span>
+                        <span class="tag tag-${v.familiarity}">${familiarityLabel(v.familiarity)}</span>
+                    </div>
+                    <div class="card-meta">
+                        <span>出现 ${v.encounter_count || 0} 次</span>
+                        <span>${v.last_heard ? formatDate(v.last_heard) : ''}</span>
+                    </div>
+                    ${v.notes ? '<p style="font-size:.85rem; color:var(--color-text-secondary); margin-top:4px;">' + esc(v.notes) + '</p>' : ''}
+                    ${linkedExps.length > 0 ? '<div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap; align-items:center;"><span style="font-size:.75rem; color:var(--color-text-muted);">关联经历：</span>' + expTags + '</div>' : ''}
+                </div>
+                <div style="display:flex; gap:4px; flex-shrink:0;">
+                    <button class="btn btn-ghost btn-sm" onclick='openEditModal(${JSON.stringify(v).replace(/'/g, "&#39;")})'>编辑</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteVocab('${v.id}', '${esc(v.word)}')">删除</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function familiarityLabel(f) {
+    return { unknown: '不认识', vague: '模糊', familiar: '熟悉' }[f] || f;
+}
+
+function openAddModal() {
+    document.getElementById('edit-modal-title').textContent = '添加词汇';
+    document.getElementById('edit-id').value = '';
+    document.getElementById('edit-word').value = '';
+    document.getElementById('edit-familiarity').value = 'unknown';
+    document.getElementById('edit-notes').value = '';
+    renderExperienceCheckboxes([]);
+    document.getElementById('edit-modal').style.display = 'flex';
+    document.getElementById('edit-word').focus();
+}
+
+function openEditModal(vocab) {
+    document.getElementById('edit-modal-title').textContent = '编辑词汇';
+    document.getElementById('edit-id').value = vocab.id;
+    document.getElementById('edit-word').value = vocab.word;
+    document.getElementById('edit-familiarity').value = vocab.familiarity;
+    document.getElementById('edit-notes').value = vocab.notes || '';
+    const linkedIds = (vocab.linked_experiences || []).map(e => e.id);
+    renderExperienceCheckboxes(linkedIds);
+    document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('edit-modal').style.display = 'none';
+}
+
+function renderExperienceCheckboxes(linkedIds) {
+    const container = document.getElementById('edit-experiences');
+    if (!allExperiences.length) {
+        container.innerHTML = '<p style="font-size:.8rem; color:var(--color-text-muted);">还没有经历记录，请先在「经历」页面添加</p>';
+        return;
+    }
+    container.innerHTML = allExperiences.map(e => `
+        <label style="display:flex; align-items:flex-start; gap:8px; padding:6px 0; cursor:pointer; border-bottom:1px solid var(--color-border);">
+            <input type="checkbox" value="${e.id}" ${linkedIds.includes(e.id) ? 'checked' : ''} style="margin-top:3px;">
+            <div>
+                <div style="font-size:.85rem;">${esc(e.description)}</div>
+                ${e.search_tags ? '<span style="font-size:.7rem; color:var(--color-text-muted);">' + esc(e.search_tags) + '</span>' : ''}
+            </div>
+        </label>
+    `).join('');
+}
+
+function saveVocab() {
+    const id = document.getElementById('edit-id').value;
+    const word = document.getElementById('edit-word').value.trim();
+    const familiarity = document.getElementById('edit-familiarity').value;
+    const notes = document.getElementById('edit-notes').value.trim();
+    const experienceIds = [...document.querySelectorAll('#edit-experiences input:checked')].map(cb => cb.value);
+
+    if (!word) { showToast('请输入词汇'); return; }
+
+    const data = { word, familiarity, notes, experience_ids: experienceIds };
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/admin/api/vocabularies/${id}` : '/admin/api/vocabularies';
+
+    api(method, url, data)
+        .then(() => {
+            showToast(id ? '已更新' : '已添加');
+            closeEditModal();
+            loadVocab();
+        })
+        .catch(err => showToast('保存失败: ' + err.message));
+}
+
+function deleteVocab(id, word) {
+    if (!confirm(`确定要删除词汇「${word}」吗？`)) return;
+    api('DELETE', `/admin/api/vocabularies/${id}`)
+        .then(() => { showToast('已删除'); loadVocab(); });
+}
+
+loadVocab();
+</script>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}提示词管理{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>提示词管理</h1>
+        <p>管理 AI 的角色设定、长期记忆和行为规则，所有修改在下次对话时自动生效</p>
+    </div>
+</div>
+
+<!-- Tab 切换 -->
+<div class="filter-tabs" style="margin-bottom:1.25rem;">
+    <button class="filter-tab active" onclick="switchTab(this, 'tab-role')">角色设定</button>
+    <button class="filter-tab" onclick="switchTab(this, 'tab-memory')">长期记忆</button>
+    <button class="filter-tab" onclick="switchTab(this, 'tab-rules')">行为规则</button>
+</div>
+
+<!-- 角色设定 -->
+<div id="tab-role" class="tab-panel">
+    <div class="card">
+        <div class="form-group">
+            <label for="role-prompt">角色设定</label>
+            <p style="font-size:.8rem; color:var(--color-text-secondary); margin-bottom:8px;">
+                定义 AI 的名字、性格和基本行为。这段文字会替换系统提示词中的 <code>&lt;identity&gt;</code> 部分。
+            </p>
+            <textarea id="role-prompt" style="min-height:180px; font-size:.95rem; line-height:1.8;"
+                placeholder="例如：你是一个叫闪电的AI小狗，性格活泼可爱，喜欢和小朋友聊天。说话要简单有趣，用小朋友能听懂的语言。">{{ role_prompt }}</textarea>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span id="save-role-status" style="font-size:.8rem; color:var(--color-text-muted);"></span>
+            <button class="btn btn-primary" onclick="saveRole()">保存角色设定</button>
+        </div>
+    </div>
+</div>
+
+<!-- 长期记忆 -->
+<div id="tab-memory" class="tab-panel" style="display:none;">
+    <div class="card">
+        <div class="form-group">
+            <label for="memory-content">长期记忆</label>
+            <p style="font-size:.8rem; color:var(--color-text-secondary); margin-bottom:8px;">
+                关于孩子的重要信息。AI 在对话中需要时会通过工具主动读取这些记忆，不需要每次都注入到提示词中。保存后立即生效。
+            </p>
+            <textarea id="memory-content" class="memory-editor"
+                placeholder="例如：&#10;小孩叫小明，今年5岁，喜欢恐龙和奥特曼。&#10;最近在学习认字，能认识简单的常用字。&#10;害怕打雷，安慰时可以聊聊彩虹。">{{ content }}</textarea>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span id="save-memory-status" style="font-size:.8rem; color:var(--color-text-muted);"></span>
+            <button class="btn btn-primary" onclick="saveMemory()">保存记忆</button>
+        </div>
+    </div>
+</div>
+
+<!-- 行为规则 -->
+<div id="tab-rules" class="tab-panel" style="display:none;">
+    <div class="card">
+        <div class="form-group">
+            <label for="rules-prompt">行为规则</label>
+            <p style="font-size:.8rem; color:var(--color-text-secondary); margin-bottom:8px;">
+                控制 AI 的说话风格和格式约束。修改后直接写入 <code>agent-base-prompt.txt</code>，影响所有对话。<br>
+                <strong style="color:var(--color-warning);">注意：这部分包含模板变量（如 <code>{% raw %}{{base_prompt}}{% endraw %}</code>），请勿删除。</strong>
+            </p>
+            <textarea id="rules-prompt" style="min-height:400px; font-size:.85rem; line-height:1.7; font-family:'Cascadia Code','Fira Code',monospace;"
+                >{{ rules_content }}</textarea>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span id="save-rules-status" style="font-size:.8rem; color:var(--color-text-muted);"></span>
+            <button class="btn btn-primary" onclick="saveRules()">保存规则</button>
+        </div>
+    </div>
+</div>
+
+<!-- 系统提示词预览 -->
+<div class="card" style="margin-top:1.25rem; background:var(--color-bg); border-style:dashed;">
+    <details>
+        <summary style="cursor:pointer; font-weight:600; font-size:.875rem; color:var(--color-text-secondary);">
+            查看当前完整系统提示词结构
+        </summary>
+        <div style="margin-top:.75rem; font-size:.8rem; color:var(--color-text-muted); line-height:1.8;">
+            <p><strong>静态部分</strong>（完全缓存命中，不动态变化）：</p>
+            <ul style="margin-left:1.25rem; margin-bottom:.5rem;">
+                <li><code>&lt;identity&gt;</code> ← <strong>角色设定</strong>（上方第一个 Tab 可编辑）</li>
+                <li><code>&lt;core_rules&gt;</code> — 5 条核心规则</li>
+                <li><code>&lt;anti_ai_smell&gt;</code> — 反 AI 味道规则</li>
+                <li><code>&lt;tts_format_constraints&gt;</code> — TTS 格式约束</li>
+                <li><code>&lt;tool_and_knowledge&gt;</code> — 工具使用说明</li>
+                <li><code>&lt;safety_compliance&gt;</code> — 安全合规</li>
+                <li><code>&lt;speaker_recognition&gt;</code> — 说话人识别</li>
+            </ul>
+            <p><strong>按需获取</strong>（通过 MCP 工具，不注入提示词）：</p>
+            <ul style="margin-left:1.25rem; margin-bottom:.5rem;">
+                <li><strong>长期记忆</strong> ← <code>get_memory</code> 工具（上方第二个 Tab 可编辑）</li>
+                <li><strong>词汇熟悉度 + 关联经历</strong> ← <code>check_vocabulary</code> 工具</li>
+                <li><strong>故事库</strong> ← <code>search_story</code> / <code>get_story_text</code> 工具</li>
+                <li><strong>天气</strong> ← <code>get_weather</code> 工具（xiaozhi 内置插件）</li>
+            </ul>
+            <p><strong>工具调用格式</strong>（根据注册的 MCP 工具动态生成）：</p>
+            <ul style="margin-left:1.25rem;">
+                <li><code>TOOL USE</code> — 工具调用格式说明 + 工具列表</li>
+                <li><code>Few-shot 示例</code> — 工具调用示例（代码注入）</li>
+            </ul>
+        </div>
+    </details>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchTab(el, tabId) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    el.classList.add('active');
+}
+
+function saveMemory() {
+    const content = document.getElementById('memory-content').value;
+    const statusEl = document.getElementById('save-memory-status');
+    api('PUT', '/admin/api/memory', { content })
+        .then(() => showSaveStatus(statusEl, '已保存'))
+        .catch(err => showSaveStatus(statusEl, '保存失败', true, err));
+}
+
+function saveRole() {
+    const content = document.getElementById('role-prompt').value;
+    const statusEl = document.getElementById('save-role-status');
+    api('PUT', '/admin/api/role_prompt', { content })
+        .then(() => showSaveStatus(statusEl, '已保存'))
+        .catch(err => showSaveStatus(statusEl, '保存失败', true, err));
+}
+
+function saveRules() {
+    const content = document.getElementById('rules-prompt').value;
+    const statusEl = document.getElementById('save-rules-status');
+    api('PUT', '/admin/api/rules', { content })
+        .then(() => showSaveStatus(statusEl, '已保存'))
+        .catch(err => showSaveStatus(statusEl, '保存失败', true, err));
+}
+
+function showSaveStatus(el, msg, isError = false, err = null) {
+    el.textContent = isError ? msg : msg + ' ✓';
+    el.style.color = isError ? 'var(--color-danger)' : 'var(--color-success)';
+    if (isError) showToast(msg + ': ' + err.message);
+    setTimeout(() => { el.textContent = ''; }, 3000);
+}
+</script>
+{% endblock %}

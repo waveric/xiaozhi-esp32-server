@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}会话记录{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>会话记录</h1>
+        <p>查看与 AI 的对话历史，可以标记「保存为故事」或「记录词汇」</p>
+    </div>
+</div>
+
+<div class="filter-tabs" style="margin-bottom:1rem;">
+    <button class="filter-tab active" onclick="filterDate(this, 'all')">全部</button>
+</div>
+
+<div id="session-list">
+    <!-- 动态渲染 -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadSessions() {
+    api('GET', '/admin/api/sessions')
+        .then(data => renderSessions(data.sessions || []));
+}
+
+function renderSessions(sessions) {
+    const container = document.getElementById('session-list');
+    if (!sessions || !sessions.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><p>还没有会话记录</p></div>';
+        return;
+    }
+
+    container.innerHTML = sessions.map(session => `
+        <div class="card session-card">
+            <div class="session-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div>
+                    <span style="font-weight:600; font-size:.9rem;">${esc(session.title || '未命名会话')}</span>
+                    <span style="font-size:.75rem; color:var(--color-text-muted); margin-left:8px;">${session.created_at || ''}</span>
+                </div>
+            </div>
+
+            <div class="card-actions">
+                <button class="btn btn-ghost btn-sm" onclick="viewSession('${session.id}')">查看详情</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteSession('${session.id}')">删除</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function viewSession(sessionId) {
+    api('GET', `/admin/api/sessions/${sessionId}`)
+        .then(session => {
+            // 显示会话详情的简单弹窗
+            let html = `<div style="max-height:60vh; overflow-y:auto;">`;
+            html += `<h3>${esc(session.title || '未命名会话')}</h3>`;
+            html += `<p style="font-size:.8rem; color:var(--color-text-muted);">${session.created_at || ''}</p>`;
+            if (session.messages && session.messages.length > 0) {
+                session.messages.forEach(msg => {
+                    const isUser = msg.role === 'user';
+                    html += `<div style="margin:8px 0; padding:8px; background:${isUser ? 'var(--color-primary-light)' : '#f0fdf4'}; border-radius:6px;">`;
+                    html += `<strong style="color:${isUser ? 'var(--color-primary)' : 'var(--color-success)'};">${isUser ? '你' : '闪电'}:</strong> `;
+                    html += esc(msg.content);
+                    html += `</div>`;
+                });
+            } else {
+                html += '<p style="color:var(--color-text-muted);">暂无消息</p>';
+            }
+            html += '</div>';
+
+            // 使用简单的 alert 或创建一个模态框
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.style.display = 'flex';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            modal.innerHTML = `<div class="modal" style="max-width:600px;">${html}<button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">关闭</button></div>`;
+            document.body.appendChild(modal);
+        })
+        .catch(err => showToast('加载失败: ' + err.message));
+}
+
+function deleteSession(sessionId) {
+    if (!confirm('确定要删除这个会话吗？')) return;
+    api('DELETE', `/admin/api/sessions/${sessionId}`)
+        .then(() => { showToast('已删除'); loadSessions(); })
+        .catch(err => showToast('删除失败: ' + err.message));
+}
+
+loadSessions();
+</script>
+{% endblock %}

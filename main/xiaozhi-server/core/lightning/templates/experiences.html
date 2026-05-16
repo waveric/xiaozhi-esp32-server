@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}经历管理{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>经历管理</h1>
+        <p>记录孩子的生活经历，AI 讲故事和解释生词时会引用这些经历</p>
+    </div>
+    <button class="btn btn-primary" onclick="openModal()">+ 新增经历</button>
+</div>
+
+<div class="search-bar">
+    <input type="search" id="search-input" placeholder="搜索经历..." onkeydown="if(event.key==='Enter')loadExperiences()">
+    <button class="btn btn-primary" onclick="loadExperiences()">搜索</button>
+</div>
+
+<div id="experience-list">
+    <!-- 动态渲染 -->
+</div>
+
+<div id="pagination" class="pagination"></div>
+
+<!-- 新增/编辑模态弹窗 -->
+<div class="modal-overlay" id="modal" style="display:none;" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+        <h2 id="modal-title">新增经历</h2>
+        <input type="hidden" id="edit-id">
+
+        <div class="form-group">
+            <label for="exp-desc">事件描述</label>
+            <textarea id="exp-desc" placeholder="例如：上周去了动物园，看到了大熊猫，小明特别开心"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="exp-tags">搜索标签（数组，JSON格式）</label>
+            <input type="text" id="exp-tags" placeholder='["动物园", "熊猫", "动物", "户外"]'>
+            <p style="font-size:.75rem; color:var(--color-text-muted); margin-top:4px;">多个标签用英文逗号分隔，放在方括号内</p>
+        </div>
+
+        <div class="form-group">
+            <label for="exp-date">事件日期</label>
+            <input type="date" id="exp-date">
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveExperience()">保存</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openModal(exp = null) {
+    document.getElementById('modal-title').textContent = exp ? '编辑经历' : '新增经历';
+    document.getElementById('edit-id').value = exp ? exp.id : '';
+    document.getElementById('exp-desc').value = exp ? exp.description : '';
+    // search_tags 是数组，转成 JSON 字符串显示
+    document.getElementById('exp-tags').value = exp && exp.search_tags ? JSON.stringify(exp.search_tags) : '';
+    document.getElementById('exp-date').value = exp ? (exp.event_date || '') : '';
+    document.getElementById('modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+}
+
+function loadExperiences() {
+    const keyword = document.getElementById('search-input').value.trim();
+    const params = new URLSearchParams({});
+    if (keyword) params.set('keyword', keyword);
+
+    api('GET', `/admin/api/experiences?${params}`)
+        .then(data => {
+            renderExperiences(data.experiences || []);
+            document.getElementById('pagination').innerHTML = '';
+        });
+}
+
+function renderExperiences(items) {
+    const container = document.getElementById('experience-list');
+    if (!items.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">🌱</div><p>还没有经历记录，点击「新增经历」添加</p></div>';
+        return;
+    }
+
+    container.innerHTML = items.map(e => `
+        <div class="card">
+            <div class="card-title">${esc(e.description)}</div>
+            <div class="card-meta">
+                ${e.event_date ? '<span>' + e.event_date + '</span>' : ''}
+            </div>
+            ${e.search_tags && e.search_tags.length > 0 ? '<div style="margin-top:6px;">' + e.search_tags.map(t => `<span class="tag">${esc(t)}</span>`).join(' ') + '</div>' : ''}
+            <div class="card-actions">
+                <button class="btn btn-ghost btn-sm" onclick='editExperience(${JSON.stringify(e).replace(/'/g, "&#39;")})'>编辑</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteExperience('${e.id}')">删除</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function editExperience(exp) {
+    openModal(exp);
+}
+
+function saveExperience() {
+    const id = document.getElementById('edit-id').value;
+    const desc = document.getElementById('exp-desc').value.trim();
+    const tagsStr = document.getElementById('exp-tags').value.trim();
+    const eventDate = document.getElementById('exp-date').value || null;
+
+    if (!desc) { showToast('请输入事件描述'); return; }
+
+    // 解析标签数组
+    let tags = [];
+    if (tagsStr) {
+        try {
+            tags = JSON.parse(tagsStr);
+            if (!Array.isArray(tags)) tags = [];
+        } catch {
+            showToast('标签格式错误，请使用 JSON 数组格式，如 ["标签1", "标签2"]');
+            return;
+        }
+    }
+
+    const data = {
+        description: desc,
+        search_tags: tags,
+        event_date: eventDate
+    };
+
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/admin/api/experiences/${id}` : '/admin/api/experiences';
+
+    api(method, url, data)
+        .then(() => {
+            showToast(id ? '已更新' : '已添加');
+            closeModal();
+            loadExperiences();
+        })
+        .catch(err => showToast('保存失败: ' + err.message));
+}
+
+function deleteExperience(id) {
+    if (!confirm('确定要删除这条经历吗？')) return;
+    api('DELETE', `/admin/api/experiences/${id}`)
+        .then(() => { showToast('已删除'); loadExperiences(); });
+}
+
+loadExperiences();
+</script>
+{% endblock %}

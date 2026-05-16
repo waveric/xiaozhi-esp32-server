@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}{% if story %}{{ story.title }}{% else %}新建故事{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>{% if story %}编辑故事{% else %}新建故事{% endif %}</h1>
+        <p><a href="/admin/stories" style="color:var(--color-primary);">← 返回故事库</a></p>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="form-group">
+        <label for="story-title">标题</label>
+        <input type="text" id="story-title" value="{{ story.title if story else '' }}" placeholder="故事标题">
+    </div>
+
+    <div class="form-group">
+        <label for="story-tags">标签（逗号分隔）</label>
+        <input type="text" id="story-tags" value="{{ story.tags | join(', ') if story and story.tags else '' }}" placeholder="冒险, 动物, 恐龙">
+    </div>
+
+    <div class="form-group">
+        <label for="story-content">故事内容</label>
+        <textarea id="story-content" style="min-height:250px;" placeholder="输入故事内容...&#10;&#10;用空行分段，每段会生成独立的音频文件。">{{ story.content if story else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label>评分</label>
+        <div class="stars" id="star-rating">
+            {% for i in range(1, 6) %}
+            <span data-val="{{ i }}" class="{% if story and story.rating >= i %}filled{% endif %}" onclick="setRating({{ i }})">★</span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if story and story.audio_segments %}
+<div class="card">
+    <label style="font-size:.875rem;font-weight:600;margin-bottom:.5rem;display:block;">音频段落</label>
+    {% for seg in story.audio_segments %}
+    <div class="audio-player">
+        <span>段落 {{ loop.index }}</span>
+        <audio controls preload="none" src="/{{ seg }}"></audio>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div style="display:flex; gap:8px; margin-top:1rem;">
+    <button class="btn btn-primary" onclick="saveStory()">保存</button>
+    {% if story %}
+    <button class="btn btn-ghost" onclick="saveStory(true)">保存并重新生成音频</button>
+    {% endif %}
+    <a href="/admin/stories" class="btn btn-ghost">取消</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentRating = {{ story.rating if story and story.rating else 0 }};
+
+function setRating(val) {
+    currentRating = val;
+    document.querySelectorAll('#star-rating span').forEach(s => {
+        s.classList.toggle('filled', parseInt(s.dataset.val) <= val);
+    });
+}
+
+function saveStory(regenerateAudio = false) {
+    const data = {
+        title: document.getElementById('story-title').value.trim(),
+        text: document.getElementById('story-content').value.trim(),
+        tags: document.getElementById('story-tags').value.split(',').map(t => t.trim()).filter(Boolean),
+        rating: currentRating
+    };
+
+    if (!data.title) { showToast('请输入标题'); return; }
+    if (!data.text) { showToast('请输入内容'); return; }
+
+    {% if story %}
+    api('PUT', `/admin/api/stories/{{ story.id }}`, data)
+        .then(() => {
+            if (regenerateAudio) {
+                showToast('已保存，正在生成音频...');
+                return api('POST', `/admin/api/stories/{{ story.id }}/regenerate-audio`);
+            }
+            showToast('已保存');
+        })
+        .then(() => { if (regenerateAudio) { showToast('音频已生成'); location.reload(); } })
+        .catch(err => showToast('保存失败: ' + err.message));
+    {% else %}
+    api('POST', '/admin/api/stories', data)
+        .then(res => { showToast('已创建'); location.href = '/admin/stories/' + res.story.id; })
+        .catch(err => showToast('创建失败: ' + err.message));
+    {% endif %}
+}
+</script>
+{% endblock %}
