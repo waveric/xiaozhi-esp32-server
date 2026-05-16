@@ -35,6 +35,7 @@ from config.config_loader import get_config_from_api_async
 from core.auth import AuthManager, AuthenticationError
 from core.utils.modules_initialize import initialize_modules
 from core.utils.util import check_vad_update, check_asr_update
+from core.lightning.chat_monitor import ChatMonitor
 
 TAG = __name__
 
@@ -44,6 +45,10 @@ class WebSocketServer:
         self.config = config
         self.logger = setup_logging()
         self.config_lock = asyncio.Lock()
+
+        # 创建 ChatMonitor 实例
+        self.chat_monitor = ChatMonitor()
+
         modules = initialize_modules(
             self.logger,
             self.config,
@@ -123,11 +128,17 @@ class WebSocketServer:
             self._intent,
             self,  # 传入server实例
         )
+        # 注入 ChatMonitor
+        handler.chat_monitor = self.chat_monitor
+        # 注册 handler 以便 TakeoverManager 使用
+        self.chat_monitor.register_handler(handler.session_id, handler)
         try:
             await handler.handle_connection(websocket)
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"处理连接时出错: {e}")
         finally:
+            # 注销 handler
+            self.chat_monitor.unregister_handler(handler.session_id)
             # 强制关闭连接（如果还没有关闭的话）
             try:
                 # 安全地检查WebSocket状态并关闭

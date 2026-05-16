@@ -191,6 +191,9 @@ class ConnectionHandler:
         # 初始化提示词管理器
         self.prompt_manager = PromptManager(self.config, self.logger)
 
+        # ChatMonitor 分发器（由 app.py 注入）
+        self.chat_monitor = None
+
     async def handle_connection(self, ws: websockets.ServerConnection):
         try:
             # 获取运行中的事件循环（必须在异步上下文中）
@@ -964,6 +967,9 @@ class ConnectionHandler:
             current_sentence_id = str(uuid.uuid4().hex)
             self.sentence_id = current_sentence_id  # 更新共享属性
             self.dialogue.put(Message(role="user", content=query))
+            # 推送用户消息给 ChatMonitor 订阅者
+            if self.chat_monitor:
+                self.chat_monitor.on_message_sync(self.session_id, "user_message", query)
             self.tts.tts_text_queue.put(
                 TTSMessageDTO(
                     sentence_id=current_sentence_id,
@@ -1111,6 +1117,9 @@ class ConnectionHandler:
                                 content_detail=content,
                             )
                         )
+                        # 推送 LLM 文本流给 ChatMonitor 订阅者
+                        if self.chat_monitor:
+                            self.chat_monitor.on_message_sync(self.session_id, "llm_text", content)
             # LLM 流式响应完成
             self.logger.bind(tag=TAG).info(f"[耗时] LLM 响应: {time.time() - llm_start_time:.3f}s")
         except Exception as e:
@@ -1217,6 +1226,9 @@ class ConnectionHandler:
                     streamed_text = "".join(response_message)
                     self.tts.store_tts_text(current_sentence_id, streamed_text)
                     self.dialogue.put(Message(role="assistant", content=streamed_text))
+                    # 推送工具调用前的文本给 ChatMonitor 订阅者
+                    if self.chat_monitor:
+                        self.chat_monitor.on_message_sync(self.session_id, "llm_text", streamed_text)
                 response_message.clear()
 
                 # 收集所有工具调用的 Future
@@ -1271,6 +1283,9 @@ class ConnectionHandler:
             text_buff = "".join(response_message)
             self.tts.store_tts_text(current_sentence_id, text_buff)
             self.dialogue.put(Message(role="assistant", content=text_buff))
+            # 推送 LLM 完整回复给 ChatMonitor 订阅者
+            if self.chat_monitor:
+                self.chat_monitor.on_message_sync(self.session_id, "llm_reply", text_buff)
 
         if depth == 0:
             self.tts.tts_text_queue.put(
@@ -1336,6 +1351,9 @@ class ConnectionHandler:
                 for idx, (_, tool_call_data) in enumerate(record_tools)
             ]
             self.dialogue.put(Message(role="assistant", tool_calls=all_tool_calls))
+            # 推送工具调用给 ChatMonitor 订阅者
+            if self.chat_monitor:
+                self.chat_monitor.on_message_sync(self.session_id, "tool_call", all_tool_calls)
 
             # 写入每条工具的执行结果，记录"工具返回了什么"
             for result, tool_call_data in record_tools:
@@ -1351,6 +1369,12 @@ class ConnectionHandler:
                         content=text,
                     )
                 )
+                # 推送工具结果给 ChatMonitor 订阅者
+                if self.chat_monitor:
+                    self.chat_monitor.on_message_sync(
+                        self.session_id, "tool_result",
+                        {"tool_call_id": tool_call_data["id"], "result": text}
+                    )
 
             # 用固定文本作为最终回复，补全标准三段式，保证下一条消息是 user 而非接 tool
             response_parts = []
@@ -1379,6 +1403,9 @@ class ConnectionHandler:
                 for idx, (_, tool_call_data) in enumerate(need_llm_tools)
             ]
             self.dialogue.put(Message(role="assistant", tool_calls=all_tool_calls))
+            # 推送工具调用给 ChatMonitor 订阅者
+            if self.chat_monitor:
+                self.chat_monitor.on_message_sync(self.session_id, "tool_call", all_tool_calls)
 
             for result, tool_call_data in need_llm_tools:
                 text = result.result
@@ -1394,6 +1421,12 @@ class ConnectionHandler:
                             content=text,
                         )
                     )
+                    # 推送工具结果给 ChatMonitor 订阅者
+                    if self.chat_monitor:
+                        self.chat_monitor.on_message_sync(
+                            self.session_id, "tool_result",
+                            {"tool_call_id": tool_call_data["id"], "result": text}
+                        )
 
             self.chat(None, depth=depth + 1)
 
