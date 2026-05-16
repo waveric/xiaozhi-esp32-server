@@ -17,6 +17,7 @@ from fastapi.responses import RedirectResponse
 from .database import init_db, get_memory, get_role_prompt, get_shared_memory
 from .config import AGENT_BASE_PROMPT_PATH
 from .auth import AuthManager, LoginRequest, LoginResponse, create_login_response, clear_auth_cookie
+from .takeover import TakeoverManager
 
 # 路径配置
 LIGHTNING_DIR = Path(__file__).parent
@@ -71,6 +72,9 @@ def create_app(chat_monitor=None) -> FastAPI:
     # 存储 chat_monitor 到 app.state
     app.state.chat_monitor = chat_monitor
 
+    # 创建 TakeoverManager 实例
+    takeover_manager = TakeoverManager(chat_monitor)
+
     # 加载配置并创建认证管理器
     config = load_config()
     auth_manager = AuthManager(config)
@@ -93,6 +97,45 @@ def create_app(chat_monitor=None) -> FastAPI:
     app.include_router(rules.router)
     app.include_router(sessions.router)
     app.include_router(characters.router)
+
+    # ===== TakeoverManager API 路由 =====
+
+    @app.post("/admin/api/takeover/{session_id}/enable")
+    async def takeover_enable(session_id: str):
+        """开启接管模式"""
+        result = takeover_manager.enable(session_id)
+        return result
+
+    @app.post("/admin/api/takeover/{session_id}/disable")
+    async def takeover_disable(session_id: str):
+        """关闭接管模式"""
+        result = takeover_manager.disable(session_id)
+        return result
+
+    @app.get("/admin/api/takeover/{session_id}/status")
+    async def takeover_status(session_id: str):
+        """获取接管状态"""
+        return {"active": takeover_manager.is_active(session_id)}
+
+    @app.post("/admin/api/takeover/{session_id}/respond")
+    async def takeover_respond(session_id: str, body: dict):
+        """以接管身份回复消息"""
+        text = body.get("text", "")
+        result = takeover_manager.respond(session_id, text)
+        return result
+
+    @app.post("/admin/api/takeover/{session_id}/execute-tool")
+    async def takeover_execute_tool(session_id: str, body: dict):
+        """执行工具"""
+        tool_name = body.get("tool_name")
+        arguments = body.get("arguments", {})
+        result = await takeover_manager.execute_tool(session_id, tool_name, arguments)
+        return result
+
+    @app.get("/admin/api/takeover/{session_id}/tools")
+    async def takeover_tools(session_id: str):
+        """获取可用工具列表"""
+        return takeover_manager.get_tools()
 
     # ===== 认证 API 路由 =====
 
