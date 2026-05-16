@@ -3,12 +3,13 @@ Lightning Tools FastAPI 应用（xiaozhi-esp32-server 集成版）
 提供 Web 管理界面和 API 端点
 """
 import os
+import asyncio
 import yaml
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Request, Response, Depends, HTTPException
+from fastapi import FastAPI, Request, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
@@ -59,9 +60,16 @@ def load_config() -> dict:
     return {}
 
 
-def create_app() -> FastAPI:
-    """创建 FastAPI 应用实例"""
+def create_app(chat_monitor=None) -> FastAPI:
+    """创建 FastAPI 应用实例
+
+    Args:
+        chat_monitor: ChatMonitor 实例，用于 WebSocket 实时消息推送
+    """
     app = FastAPI(title="Lightning Tools", lifespan=lifespan)
+
+    # 存储 chat_monitor 到 app.state
+    app.state.chat_monitor = chat_monitor
 
     # 加载配置并创建认证管理器
     config = load_config()
@@ -191,5 +199,95 @@ def create_app() -> FastAPI:
     async def admin_characters(request: Request, _: Optional[str] = Depends(auth_dependency)):
         """角色管理页面"""
         return templates.TemplateResponse(request, "characters.html")
+
+    # ===== WebSocket 端点 =====
+
+    @app.websocket("/admin/ws/chat")
+    async def websocket_chat(websocket: WebSocket, session_id: str = None):
+        """WebSocket 端点，实时推送对话消息
+
+        Args:
+            websocket: WebSocket 连接
+            session_id: 可选的会话 ID，用于订阅特定会话的消息
+
+        消息格式:
+            {"type": "user_message", "content": "...", "is_history": false}
+            {"type": "llm_text", "content": "...", "is_history": false}
+            {"type": "llm_reply", "content": "...", "is_history": false}
+            {"type": "tool_call", "content": {...}, "is_history": false}
+            {"type": "tool_result", "content": {...}, "is_history": false}
+        """
+        await websocket.accept()
+
+        # 获取 ChatMonitor 实例
+        chat_monitor = websocket.app.state.chat_monitor
+
+        if chat_monitor is None:
+            # ChatMonitor 未配置，发送错误并关闭
+            await websocket.send_json({"type": "error", "content": "ChatMonitor not configured"})
+            await websocket.close()
+            return
+
+        # 如果没有 session_id，尝试获取当前活跃的 session
+        if not session_id:
+            # 获取第一个有 handler 的 session
+            if chat_monitor.handlers:
+                session_id = next(iter(chat_monitor.handlers.keys()))
+            else:
+                session_id = "default"
+
+        try:
+            # 发送历史消息（如果有 handler 且有 dialogue）
+            handler = chat_monitor.get_handler(session_id)
+            if handler and hasattr(handler, 'dialogue'):
+                for msg in handler.dialogue.dialogue:
+                    # 跳过系统消息和临时消息
+                    if msg.role == "system" or msg.is_temporary:
+                        continue
+
+                    # 构建历史消息
+                    if msg.role == "user":
+                        await websocket.send_json({
+                            "type": "user_message",
+                            "content": msg.content,
+                            "is_history": True
+                        })
+                    elif msg.role == "assistant":
+                        if msg.tool_calls:
+                            # 工具调用消息
+                            await websocket.send_json({
+                                "type": "tool_call",
+                                "content": msg.tool_calls,
+                                "is_history": True
+                            })
+                        else:
+                            # 助手文本消息
+                            await websocket.send_json({
+                                "type": "llm_reply",
+                                "content": msg.content,
+                                "is_history": True
+                            })
+                    elif msg.role == "tool":
+                        # 工具结果消息
+                        await websocket.send_json({
+                            "type": "tool_result",
+                            "content": {
+                                "tool_call_id": msg.tool_call_id,
+                                "content": msg.content
+                            },
+                            "is_history": True
+                        })
+
+            # 订阅实时消息流
+            async for msg in chat_monitor.subscribe(session_id):
+                # 添加 is_history 标记（实时消息都是 false）
+                msg["is_history"] = False
+                await websocket.send_json(msg)
+
+        except WebSocketDisconnect:
+            pass
+        finally:
+            # ChatMonitor.subscribe() 的 finally 会自动调用 unsubscribe
+            pass
 
     return app

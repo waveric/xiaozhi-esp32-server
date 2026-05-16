@@ -73,7 +73,10 @@ async def main():
 
     # ===== 启动 Lightning Tools FastAPI (端口 8080) =====
     import uvicorn
-    lightning_app = create_lightning_app()
+    # 先创建 WebSocketServer，获取 chat_monitor
+    ws_server = WebSocketServer(config)
+
+    lightning_app = create_lightning_app(chat_monitor=ws_server.chat_monitor)
     lightning_config = uvicorn.Config(
         lightning_app,
         host="0.0.0.0",
@@ -85,8 +88,7 @@ async def main():
     lightning_task = asyncio.create_task(lightning_server.serve())
     logger.bind(tag=TAG).info("Lightning Admin 管理界面是\thttp://{}:8080/admin/", get_local_ip())
 
-    # 启动 WebSocket 服务器
-    ws_server = WebSocketServer(config)
+    # 启动 WebSocket 服务器（已在上面创建）
     ws_task = asyncio.create_task(ws_server.start())
     # 启动 Simple http 服务器
     ota_server = SimpleHttpServer(config)
