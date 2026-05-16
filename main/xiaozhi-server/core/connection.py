@@ -43,6 +43,7 @@ from core.utils.prompt_manager import PromptManager
 from core.utils.voiceprint_provider import VoiceprintProvider
 from core.utils.util import get_system_error_response
 from core.utils import textUtils
+from core.lightning.database import save_session, save_session_message
 
 
 TAG = __name__
@@ -307,6 +308,25 @@ class ConnectionHandler:
 
                 # 启动线程保存记忆，不等待完成
                 threading.Thread(target=save_memory_task, daemon=True).start()
+
+            # 守护线程3：保存对话历史到 sessions 表
+            if self.session_id and self.dialogue.dialogue:
+                def save_session_history_task():
+                    try:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        loop.run_until_complete(
+                            self._save_dialogue_history()
+                        )
+                    except Exception as e:
+                        self.logger.bind(tag=TAG).error(f"保存对话历史失败: {e}")
+                    finally:
+                        try:
+                            loop.close()
+                        except Exception:
+                            pass
+
+                threading.Thread(target=save_session_history_task, daemon=True).start()
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"保存记忆失败: {e}")
         finally:
@@ -317,6 +337,31 @@ class ConnectionHandler:
                 self.logger.bind(tag=TAG).error(
                     f"保存记忆后关闭连接失败: {close_error}"
                 )
+
+    async def _save_dialogue_history(self):
+        """保存对话历史到 sessions 和 session_messages 表"""
+        # 过滤 is_temporary=True 的消息（few-shot 不保存）
+        messages = [m for m in self.dialogue.dialogue if not m.is_temporary]
+
+        if not messages:
+            return
+
+        # session 标题取第一条 user 消息前 20 字符
+        first_user_msg = next((m for m in messages if m.role == 'user'), None)
+        title = first_user_msg.content[:20] if first_user_msg and first_user_msg.content else "新对话"
+
+        # 保存 session
+        await save_session(session_id=self.session_id, title=title)
+
+        # 保存每条消息
+        for msg in messages:
+            tool_call_json = json.dumps(msg.tool_calls, ensure_ascii=False) if msg.tool_calls else None
+            await save_session_message(
+                self.session_id,
+                msg.role,
+                msg.content or "",
+                tool_call_json
+            )
 
     async def _discard_message_with_bind_prompt(self):
         """丢弃消息并检查是否需要播放绑定提示"""

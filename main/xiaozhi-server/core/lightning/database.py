@@ -618,13 +618,14 @@ async def delete_experience(exp_id: str) -> bool:
 
 # ===== Sessions 操作 =====
 
-async def save_session(title: str = None) -> dict:
-    """创建新会话"""
-    session_id = str(uuid.uuid4())
+async def save_session(session_id: str = None, title: str = None) -> dict:
+    """创建新会话，如果提供 session_id 则使用该 ID"""
+    if session_id is None:
+        session_id = str(uuid.uuid4())
 
     async with aiosqlite.connect(DATABASE_PATH) as db:
         await db.execute(
-            "INSERT INTO sessions (id, title) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO sessions (id, title) VALUES (?, ?)",
             (session_id, title)
         )
         await db.commit()
